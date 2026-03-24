@@ -81,6 +81,15 @@ public class Casa {
         return true;
     }
 
+    //TODO
+    public boolean removeAparelho(int id, Permissao p) {
+        if (!tabelaPermissoes.containsKey(p)) {
+            return false;
+        }
+
+        return tabelaSeccoes.get(p).removeAparelho(id);
+    }
+
     public String getOwner() {
         for (Map.Entry<User, EnumSet<Permissao>> entry : tabelaPermissoes.entrySet()) {
             if (entry.getValue().contains(Permissao.owner)) {

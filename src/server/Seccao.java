@@ -1,12 +1,14 @@
 package src.server;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.io.*;
 
 public class Seccao {
 
     public final Permissao id;
     private Aparelho[] aparelhos;
+    private int counter = 0; //TODO mudar a logica basicamente toda de acesso ao array
 
     public Seccao(Permissao id) {
         this.id = id;
@@ -27,11 +29,20 @@ public class Seccao {
     public void addAparelho(int estado, File f) {
         Aparelho ap = new Aparelho(id, "" + id.name() + (1 + this.aparelhos.length), estado, f);
         insertInArray(ap);
+
+        counter++;
     }
 
     public void addAparelho(File f) {
         Aparelho ap = new Aparelho(id, "" + id.name() + (1 + this.aparelhos.length), 0, f);
         insertInArray(ap);
+
+        counter++;
+    }
+
+    //TODO
+    public boolean removeAparelho(int id) {
+        return false;
     }
 
     public int getEstado(int id) {
