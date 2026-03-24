@@ -8,7 +8,7 @@ public class Seccao {
 
     public final Permissao id;
     private Aparelho[] aparelhos;
-    private int counter = 0; //TODO mudar a logica basicamente toda de acesso ao array
+    private int counter = 0;
 
     public Seccao(Permissao id) {
         this.id = id;
@@ -40,10 +40,12 @@ public class Seccao {
         counter++;
     }
 
-    //TODO
+    //unused
+    /**
     public boolean removeAparelho(int id) {
         return false;
     }
+    */
 
     public int getEstado(int id) {
         if (id < 1 || id > this.aparelhos.length) {
@@ -61,6 +63,6 @@ public class Seccao {
     }
 
     public int getAparelhoCount() {
-        return aparelhos.length;
+        return this.counter;
     }
 }
