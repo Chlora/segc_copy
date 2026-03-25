@@ -5,7 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.io.*;
 
-public class Casa { //TODO adicionar synchronized aos metodos
+public class Casa {
 
     private Map<User, EnumSet<Permissao>> tabelaPermissoes;
     public final String id;
@@ -19,7 +19,7 @@ public class Casa { //TODO adicionar synchronized aos metodos
         tabelaPermissoes.put(owner, EnumSet.of(Permissao.owner));
     }
 
-    public void givePerms(User user, EnumSet<Permissao> p) {
+    public synchronized void givePerms(User user, EnumSet<Permissao> p) {
         if (!this.tabelaPermissoes.containsKey(user)) {
             this.tabelaPermissoes.put(user, p);
             return;
@@ -28,7 +28,7 @@ public class Casa { //TODO adicionar synchronized aos metodos
         this.tabelaPermissoes.get(user).addAll(p);
     }
 
-    public void givePerms(User user, Permissao p) {
+    public synchronized void givePerms(User user, Permissao p) {
         if (!this.tabelaPermissoes.containsKey(user)) {
             this.tabelaPermissoes.put(user, EnumSet.of(p));
             return;
@@ -37,7 +37,7 @@ public class Casa { //TODO adicionar synchronized aos metodos
         this.tabelaPermissoes.get(user).add(p);
     }
 
-    public boolean addSeccao(Permissao p) {
+    public synchronized boolean addSeccao(Permissao p) {
         if (tabelaSeccoes.containsKey(p)) {
             return false;
         }
@@ -48,7 +48,7 @@ public class Casa { //TODO adicionar synchronized aos metodos
         return true;
     }
 
-    public boolean addAparelho(Permissao p) {
+    public synchronized boolean addAparelho(Permissao p) {
         if (!tabelaSeccoes.containsKey(p)) {
             addSeccao(p);
         }
@@ -60,7 +60,7 @@ public class Casa { //TODO adicionar synchronized aos metodos
         return true;
     }
 
-    public boolean addAparelho(Permissao p, int estado) {
+    public synchronized boolean addAparelho(Permissao p, int estado) {
         if (!tabelaSeccoes.containsKey(p)) {
             addSeccao(p);
         }
@@ -72,7 +72,7 @@ public class Casa { //TODO adicionar synchronized aos metodos
         return true;
     }
 
-    public boolean addAparelho(Permissao p, int estado, File existingLog) {
+    public synchronized boolean addAparelho(Permissao p, int estado, File existingLog) {
         if (!tabelaSeccoes.containsKey(p)) {
             addSeccao(p);
         }
@@ -82,7 +82,7 @@ public class Casa { //TODO adicionar synchronized aos metodos
 
     //unused
     /**
-    public boolean removeAparelho(int id, Permissao p) {
+    public synchronized boolean removeAparelho(int id, Permissao p) {
         if (!tabelaPermissoes.containsKey(p)) {
             return false;
         }
@@ -101,7 +101,7 @@ public class Casa { //TODO adicionar synchronized aos metodos
         return "";
     }
 
-    public int getEstado(String id) {
+    public synchronized int getEstado(String id) {
         if (id.length() < 2) {
             return -1;
         }
@@ -126,7 +126,7 @@ public class Casa { //TODO adicionar synchronized aos metodos
         }
     }
 
-    public boolean changeEstado(String id, int newEstado) {
+    public synchronized boolean changeEstado(String id, int newEstado) {
         if (id.length() < 2) {
             return false;
         }
@@ -152,23 +152,23 @@ public class Casa { //TODO adicionar synchronized aos metodos
 
     }
 
-    public Map<User, EnumSet<Permissao>> getPermissoes() {
+    public synchronized Map<User, EnumSet<Permissao>> getPermissoes() {
         return tabelaPermissoes;
     }
 
-    public boolean UserTemPermParaSeccao(User u, Permissao p) {
+    public synchronized boolean UserTemPermParaSeccao(User u, Permissao p) {
         return tabelaPermissoes.containsKey(u) && (tabelaPermissoes.get(u).contains(p) || tabelaPermissoes.get(u).contains(Permissao.all) || tabelaPermissoes.get(u).contains(Permissao.owner));
     }
 
-    public Map<Permissao, Seccao> getSeccoes() {
+    public synchronized Map<Permissao, Seccao> getSeccoes() {
         return tabelaSeccoes;
     }
 
-    public boolean ExisteSeccao(Permissao p) {
+    public synchronized boolean ExisteSeccao(Permissao p) {
         return tabelaSeccoes.containsKey(p);
     }
 
-    public boolean ExisteAparelho(String id) {
+    public synchronized boolean ExisteAparelho(String id) {
         try {
             Permissao p = Permissao.valueOf(String.valueOf(id.charAt(0)));
             Seccao s = tabelaSeccoes.get(p);

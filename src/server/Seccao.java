@@ -53,6 +53,13 @@ public class Seccao {
         return this.aparelhos[id - 1].getEstado();
     }
 
+    public String GetUltimoEstado(int id) {
+        if (id < 1 || id > this.aparelhos.length) {
+            return "";
+        }
+        return this.aparelhos[id - 1].GetUltimoEstado();
+    }
+
     public boolean changeEstado(int id, int newEstado, String casaID) {
         if (id < 1 || id > this.aparelhos.length) {
             return false;

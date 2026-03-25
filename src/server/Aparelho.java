@@ -10,6 +10,7 @@ public class Aparelho {
     public final String nome;
     private final File logFile;
     private int estado;
+    private String ultimoEstado = "";
 
     private static final DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -36,6 +37,7 @@ public class Aparelho {
 
         log(this.estado, newEstado, casaID);
         this.estado = newEstado;
+        ultimoEstado = "Estado mudado de " + estado + " para " + newEstado;
 
         return true;
     }
@@ -55,5 +57,9 @@ public class Aparelho {
         } catch (IOException e) {
             System.err.println("Erro ao escrever log de " + nome + ": " + e.getMessage());
         }
+    }
+
+    public String GetUltimoEstado() {
+        return this.ultimoEstado;
     }
 }

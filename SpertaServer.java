@@ -2,14 +2,14 @@
 
 import java.io.*;
 import java.net.*;
-import java.util.*;
+import java.util.Map;
 
 import src.server.Casa;
 import src.server.CatalogoCasas;
 import src.server.CatalogoUsers;
 import src.server.Permissao;
+import src.server.Seccao;
 import src.server.User;
-import java.util.EnumSet;
 
 public class SpertaServer {
     private static final int DEFAULT_PORT = 22345;
@@ -81,7 +81,7 @@ public class SpertaServer {
             out.writeObject("OK");
         } catch (IllegalArgumentException e) {
             out.writeObject("NOK");
-        }        
+        }
     }
 
     // regista aparelho na casa hm seccao s
@@ -100,13 +100,13 @@ public class SpertaServer {
 
         try {
             Permissao p = Permissao.valueOf(s);
-            
+
             c.addAparelho(p);
             catalogoCasas.saveCasa(c);
             out.writeObject("OK");
         } catch (IllegalArgumentException e) {
             out.writeObject("NOK");
-        }         
+        }
     }
 
     // mete o dispositivo d com estado v na casa hm
@@ -125,13 +125,13 @@ public class SpertaServer {
 
         try {
             Permissao p = Permissao.valueOf(String.valueOf(d.charAt(0)));
-            
-            if(!c.UserTemPermParaSeccao(u, p)) {
+
+            if (!c.UserTemPermParaSeccao(u, p)) {
                 out.writeObject("NOPERM");
                 return;
             }
 
-            if(!c.changeEstado(d, v)) {
+            if (!c.changeEstado(d, v)) {
                 out.writeObject("NOK");
                 return;
             }
@@ -140,7 +140,7 @@ public class SpertaServer {
             out.writeObject("OK");
         } catch (IllegalArgumentException e) {
             out.writeObject("NOK");
-        }   
+        }
 
     }
 
@@ -148,13 +148,74 @@ public class SpertaServer {
     // casa hm
     // TODO
     private static void rt(User u, String hm, ObjectOutputStream out) throws IOException {
+        Casa c = catalogoCasas.getWithId(hm);
 
+        if (c == null) {
+            out.writeObject("NOHM");
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder();
+
+        for (Map.Entry<Permissao, Seccao> entry : c.getSeccoes().entrySet()) {
+            if (!c.UserTemPermParaSeccao(u, entry.getKey())) {
+                continue;
+            }
+
+            Seccao s = entry.getValue();
+            for (int i = 1; i <= s.getAparelhoCount(); i++) {
+                String deviceId = entry.getKey().name() + i;
+                sb.append(deviceId).append(":").append(s.GetUltimoEstado(i)).append("\n");
+            }
+        }
+
+        if (sb.length() == 0) {
+            out.writeObject("NOPERM");
+            return;
+        }
+
+        byte[] data = sb.toString().getBytes();
+        out.writeObject("OK");
+        out.writeLong(data.length);
+        out.write(data);
     }
 
     // da ao cliente o log do dispositivo d da casa hm
     // TODO
     private static void rh(User u, String hm, String d, ObjectOutputStream out) throws IOException {
+        Casa c = catalogoCasas.getWithId(hm);
 
+        if (c == null) {
+            out.writeObject("NOHM");
+            return;
+        }
+
+        if (!c.ExisteAparelho(d)) {
+            out.writeObject("NOD");
+            return;
+        }
+
+        Permissao p = Permissao.valueOf(String.valueOf(d.charAt(0)));
+        if (!c.UserTemPermParaSeccao(u, p)) {
+            out.writeObject("NOPERM");
+            return;
+        }
+
+        File logFile = new File("ficheiros/casas/" + hm + "/" + d.charAt(0) + "/" + d + ".txt");
+
+        if (!logFile.exists() || logFile.length() == 0) {
+            out.writeObject("NODATA");
+            return;
+        }
+
+        byte[] data = new byte[(int) logFile.length()];
+        try (FileInputStream fis = new FileInputStream(logFile)) {
+            fis.read(data);
+        }
+
+        out.writeObject("OK");
+        out.writeLong(data.length);
+        out.write(data);
     }
 
     // processa a string de comando, faz validacoes, e chama um dos metodos acima
@@ -299,7 +360,7 @@ public class SpertaServer {
                 try {
                     socket.close();
                 } catch (IOException e) {
-                    // TODO: handle exception
+                    // TODO
                 }
             }
         }
