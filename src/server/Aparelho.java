@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 public class Aparelho {
-    
+
     public final Permissao tipo;
     public final String nome;
     private final File logFile;
@@ -18,6 +18,15 @@ public class Aparelho {
         this.nome = nome;
         this.estado = estado;
         this.logFile = f;
+
+        if (f != null && !f.exists()) {
+            f.getParentFile().mkdirs();
+            try {
+                f.createNewFile();
+            } catch (IOException e) {
+                System.err.println("Erro ao criar ficheiro de log de " + nome + ": " + e.getMessage());
+            }
+        }
     }
 
     public boolean changeEstado(int newEstado, String casaID) {
@@ -37,7 +46,8 @@ public class Aparelho {
 
     private void log(int estado, int newEstado, String casaID) {
         LogGlobalAparelhos.write(casaID, nome, " : Estado mudado de " + estado + " para " + newEstado);
-        if (logFile == null) return;
+        if (logFile == null)
+            return;
         logFile.getParentFile().mkdirs();
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(logFile, true))) {
             bw.write(LocalDateTime.now().format(fmt) + " : Estado mudado de " + estado + " para " + newEstado);

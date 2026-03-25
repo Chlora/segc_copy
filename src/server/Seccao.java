@@ -7,7 +7,7 @@ public class Seccao {
 
     public final Permissao id;
     private Aparelho[] aparelhos;
-    private int counter = 0;
+    private int counter = 1;
 
     public Seccao(Permissao id) {
         this.id = id;

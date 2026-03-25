@@ -110,18 +110,25 @@ public class CatalogoCasas {
                 Permissao p = Permissao.valueOf(seccaoDir.getName());
                 casa.addSeccao(p);
 
-                // 3. aparelhos
-                File[] deviceFiles = seccaoDir.listFiles(
-                        f -> f.isFile() && f.getName().endsWith(".txt"));
-                if (deviceFiles == null)
+                // 3. read counter
+                File counterFile = new File(seccaoDir, "counter.txt");
+                if (!counterFile.exists())
                     continue;
 
-                Arrays.sort(deviceFiles, Comparator.comparing(File::getName));
+                int counter = 0;
+                try (BufferedReader brCounter = new BufferedReader(new FileReader(counterFile))) {
+                    String counterLine = brCounter.readLine();
+                    if (counterLine != null)
+                        counter = Integer.parseInt(counterLine.trim());
+                } catch (IOException | NumberFormatException e) {
+                    System.err.println("Erro ao ler counter da seccao: " + e.getMessage());
+                    continue;
+                }
 
-                for (File deviceFile : deviceFiles) {
-                    int estado = readLastEstado(deviceFile);
-                    Permissao p2 = Permissao.valueOf(seccaoDir.getName());
-                    casa.addAparelho(p2, estado, deviceFile);
+                // 4. aparelho by index
+                for (int i = 1; i <= counter; i++) {
+                    File deviceFile = new File(seccaoDir, p.name() + i + ".txt");
+                    casa.addAparelho(p, 0, deviceFile);
                 }
 
             } catch (IllegalArgumentException e) {
@@ -130,26 +137,6 @@ public class CatalogoCasas {
         }
 
         return casa;
-    }
-
-    private int readLastEstado(File logFile) {
-        int estado = 0;
-        if (!logFile.exists())
-            return estado;
-        try (BufferedReader br = new BufferedReader(new FileReader(logFile))) {
-            String line, last = null;
-            while ((line = br.readLine()) != null)
-                last = line;
-            if (last != null) {
-                // format: "2026-03-19 14:32:01 : Estado mudado de 0 para 45"
-                String[] parts = last.split(" para ");
-                if (parts.length == 2)
-                    estado = Integer.parseInt(parts[1].trim());
-            }
-        } catch (IOException | NumberFormatException e) {
-            System.err.println("Erro a ler ultimo estado: " + e.getMessage());
-        }
-        return estado;
     }
 
     public void saveCasa(Casa c) {
@@ -172,12 +159,26 @@ public class CatalogoCasas {
                 for (Permissao p : entry.getValue()) {
                     sb.append(p.name()).append(",");
                 }
-                sb.setLength(sb.length() - 1); // remove trailing comma
+                sb.setLength(sb.length() - 1);
                 bw.write(sb.toString());
                 bw.newLine();
             }
         } catch (IOException e) {
             System.err.println("Erro ao gravar info da casa: " + e.getMessage());
+        }
+
+        // section counters
+        for (Map.Entry<Permissao, Seccao> entry : c.getSeccoes().entrySet()) {
+            File seccaoDir = new File(casaDir, entry.getKey().name());
+            if (!seccaoDir.exists())
+                seccaoDir.mkdirs();
+
+            File counterFile = new File(seccaoDir, "counter.txt");
+            try (BufferedWriter bw = new BufferedWriter(new FileWriter(counterFile))) {
+                bw.write(String.valueOf(entry.getValue().getAparelhoCount()));
+            } catch (IOException e) {
+                System.err.println("Erro ao gravar counter da seccao: " + e.getMessage());
+            }
         }
     }
 }
