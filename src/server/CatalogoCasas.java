@@ -2,9 +2,7 @@ package src.server;
 
 import java.io.*;
 import java.util.HashMap;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.Map;
 
@@ -18,15 +16,15 @@ public class CatalogoCasas {
         loadAll(c);
     }
 
-    public Casa getWithId(String id) {
+    public synchronized Casa getWithId(String id) {
         return tabela.get(id);
     }
 
-    public Collection<Casa> getAll() {
+    public synchronized Collection<Casa> getAll() {
         return tabela.values();
     }
 
-    public boolean addCasa(String id, User owner) {
+    public synchronized boolean addCasa(String id, User owner) {
         if (tabela.containsKey(id)) {
             return false;
         }
@@ -35,11 +33,11 @@ public class CatalogoCasas {
         return true;
     }
 
-    public boolean exists(String id) {
+    public synchronized boolean exists(String id) {
         return tabela.containsKey(id);
     }
 
-    private void loadAll(CatalogoUsers catalogoUsers) {
+    private synchronized void loadAll(CatalogoUsers catalogoUsers) {
         File[] casaDirs = ROOT_DIR.listFiles(File::isDirectory);
         if (casaDirs == null)
             return;
@@ -89,7 +87,7 @@ public class CatalogoCasas {
                             System.err.println("Permissao invalida: " + p);
                         }
                     }
-                    casa.addUser(perms, user);
+                    casa.givePerms(user, perms);
                 }
             }
         } catch (IOException e) {
@@ -139,7 +137,7 @@ public class CatalogoCasas {
         return casa;
     }
 
-    public void saveCasa(Casa c) {
+    public synchronized void saveCasa(Casa c) {
         File casaDir = new File(ROOT_DIR, c.id);
         if (!casaDir.exists())
             casaDir.mkdirs();

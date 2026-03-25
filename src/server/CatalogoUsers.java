@@ -16,15 +16,15 @@ public class CatalogoUsers {
         loadFromFile();
     }
 
-    public User getWithNome(String nome) {
+    public synchronized User getWithNome(String nome) {
         return tabela.get(nome);
     }
 
-    public Collection<User> getAll() {
+    public synchronized Collection<User> getAll() {
         return tabela.values();
     }
 
-    public boolean addUser(String nome, String password) {
+    public synchronized boolean addUser(String nome, String password) {
         if (tabela.containsKey(nome)) {
             return false;
         }
@@ -34,18 +34,18 @@ public class CatalogoUsers {
         return true;
     }
 
-    public boolean exists(String nome) {
+    public synchronized boolean exists(String nome) {
         return tabela.containsKey(nome);
     }
 
-    public boolean authenticate(String nome, String password) {
+    public synchronized boolean authenticate(String nome, String password) {
         User u = tabela.get(nome);
         if (u == null)
             return false;
         return u.password.equals(password);
     }
 
-    private void loadFromFile() {
+    private synchronized void loadFromFile() {
         if (!f.exists()) {
             return;
         }
@@ -65,7 +65,7 @@ public class CatalogoUsers {
         }
     }
 
-    private void saveToFile() {
+    private synchronized void saveToFile() {
         f.getParentFile().mkdirs();
         System.out.println("Saving to: " + f.getAbsolutePath());
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(f))) {

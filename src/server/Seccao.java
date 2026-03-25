@@ -62,6 +62,6 @@ public class Seccao {
     }
 
     public int getAparelhoCount() {
-        return this.counter;
+        return this.counter - 1;
     }
 }

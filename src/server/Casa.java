@@ -5,7 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.io.*;
 
-public class Casa {
+public class Casa { //TODO adicionar synchronized aos metodos
 
     private Map<User, EnumSet<Permissao>> tabelaPermissoes;
     public final String id;
@@ -19,24 +19,22 @@ public class Casa {
         tabelaPermissoes.put(owner, EnumSet.of(Permissao.owner));
     }
 
-    public boolean addUser(EnumSet<Permissao> p, User user) {
-        if (this.tabelaPermissoes.containsKey(user)) {
-            return false;
+    public void givePerms(User user, EnumSet<Permissao> p) {
+        if (!this.tabelaPermissoes.containsKey(user)) {
+            this.tabelaPermissoes.put(user, p);
+            return;
         }
 
-        this.tabelaPermissoes.put(user, p);
-
-        return true;
+        this.tabelaPermissoes.get(user).addAll(p);
     }
 
-    public boolean updateUser(User user, EnumSet<Permissao> p) {
+    public void givePerms(User user, Permissao p) {
         if (!this.tabelaPermissoes.containsKey(user)) {
-            return false;
+            this.tabelaPermissoes.put(user, EnumSet.of(p));
+            return;
         }
 
-        this.tabelaPermissoes.put(user, p);
-
-        return true;
+        this.tabelaPermissoes.get(user).add(p);
     }
 
     public boolean addSeccao(Permissao p) {
@@ -52,7 +50,7 @@ public class Casa {
 
     public boolean addAparelho(Permissao p) {
         if (!tabelaSeccoes.containsKey(p)) {
-            return false;
+            addSeccao(p);
         }
 
         File f = new File("ficheiros/casas/" + this.id + "/" + p.name() + "/" + p.name()
@@ -64,7 +62,7 @@ public class Casa {
 
     public boolean addAparelho(Permissao p, int estado) {
         if (!tabelaSeccoes.containsKey(p)) {
-            return false;
+            addSeccao(p);
         }
 
         File f = new File("ficheiros/casas/" + this.id + "/" + p.name() + "/" + p.name()
@@ -75,8 +73,9 @@ public class Casa {
     }
 
     public boolean addAparelho(Permissao p, int estado, File existingLog) {
-        if (!tabelaSeccoes.containsKey(p))
-            return false;
+        if (!tabelaSeccoes.containsKey(p)) {
+            addSeccao(p);
+        }
         tabelaSeccoes.get(p).addAparelho(estado, existingLog);
         return true;
     }
@@ -157,7 +156,28 @@ public class Casa {
         return tabelaPermissoes;
     }
 
+    public boolean UserTemPermParaSeccao(User u, Permissao p) {
+        return tabelaPermissoes.containsKey(u) && (tabelaPermissoes.get(u).contains(p) || tabelaPermissoes.get(u).contains(Permissao.all) || tabelaPermissoes.get(u).contains(Permissao.owner));
+    }
+
     public Map<Permissao, Seccao> getSeccoes() {
         return tabelaSeccoes;
+    }
+
+    public boolean ExisteSeccao(Permissao p) {
+        return tabelaSeccoes.containsKey(p);
+    }
+
+    public boolean ExisteAparelho(String id) {
+        try {
+            Permissao p = Permissao.valueOf(String.valueOf(id.charAt(0)));
+            Seccao s = tabelaSeccoes.get(p);
+
+            int resto = Integer.parseInt(id.substring(1));
+
+            return s != null && s.getAparelhoCount() >= resto;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 }

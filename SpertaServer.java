@@ -45,64 +45,207 @@ public class SpertaServer {
     }
 
     // cria casa
-    // TODO
-    private static void create(String hm) {
-
+    private static void create(User u, String hm, ObjectOutputStream out) throws IOException {
+        if (catalogoCasas.addCasa(hm, u)) {
+            out.writeObject("OK");
+            return;
+        }
+        out.writeObject("NOK");
     }
 
     // da permissao s ao username na casa hm
-    // TODO
-    private static void add(String username, String hm, String string) {
+    private static void add(User u, String username, String hm, String s, ObjectOutputStream out) throws IOException {
+        Casa c = catalogoCasas.getWithId(hm);
 
+        if (c == null) {
+            out.writeObject("NOHM");
+            return;
+        }
+
+        User uToAdd = catalogoUsers.getWithNome(username);
+
+        if (uToAdd == null) {
+            out.writeObject("NOUSER");
+            return;
+        }
+
+        if (!c.getOwner().equals(u.nome)) {
+            out.writeObject("NOPERM");
+            return;
+        }
+
+        try {
+            Permissao p = Permissao.valueOf(s);
+            c.givePerms(uToAdd, p);
+            catalogoCasas.saveCasa(c);
+            out.writeObject("OK");
+        } catch (IllegalArgumentException e) {
+            out.writeObject("NOK");
+        }        
     }
 
     // regista aparelho na casa hm seccao s
-    private static void rd(String hm, String s) {
+    private static void rd(User u, String hm, String s, ObjectOutputStream out) throws IOException {
+        Casa c = catalogoCasas.getWithId(hm);
 
+        if (c == null) {
+            out.writeObject("NOHM");
+            return;
+        }
+
+        if (!c.getOwner().equals(u.nome)) {
+            out.writeObject("NOPERM");
+            return;
+        }
+
+        try {
+            Permissao p = Permissao.valueOf(s);
+            
+            c.addAparelho(p);
+            catalogoCasas.saveCasa(c);
+            out.writeObject("OK");
+        } catch (IllegalArgumentException e) {
+            out.writeObject("NOK");
+        }         
     }
 
     // mete o dispositivo d com estado v na casa hm
-    // TODO
-    private static void ec(String hm, String d, int v) {
+    private static void ec(User u, String hm, String d, int v, ObjectOutputStream out) throws IOException {
+        Casa c = catalogoCasas.getWithId(hm);
+
+        if (c == null) {
+            out.writeObject("NOHM");
+            return;
+        }
+
+        if (!c.ExisteAparelho(d)) {
+            out.writeObject("NOD");
+            return;
+        }
+
+        try {
+            Permissao p = Permissao.valueOf(String.valueOf(d.charAt(0)));
+            
+            if(!c.UserTemPermParaSeccao(u, p)) {
+                out.writeObject("NOPERM");
+                return;
+            }
+
+            if(!c.changeEstado(d, v)) {
+                out.writeObject("NOK");
+                return;
+            }
+
+            catalogoCasas.saveCasa(c);
+            out.writeObject("OK");
+        } catch (IllegalArgumentException e) {
+            out.writeObject("NOK");
+        }   
 
     }
 
     // envia ao cliente um .txt contendo todos os ultimos comandos dos aparelhos da
     // casa hm
     // TODO
-    private static void rt(String hm) {
+    private static void rt(User u, String hm, ObjectOutputStream out) throws IOException {
 
     }
 
     // da ao cliente o log do dispositivo d da casa hm
     // TODO
-    private static void rh(String hm, String d) {
+    private static void rh(User u, String hm, String d, ObjectOutputStream out) throws IOException {
 
     }
 
     // processa a string de comando, faz validacoes, e chama um dos metodos acima
     // TODO
-    private static void proccessCommand(String comando) {
-    }
+    private static void proccessCommand(String comando, User u, ObjectOutputStream out) throws IOException {
+        String[] tokens = comando.trim().split("\\s+");
 
-    // processa a string
-    // ve se o utilizador existe. se sim, ve se a pass tem match
-    // senao cria novo registo
-    // escreve username em loggedUser
-    private static boolean authenticate(String composta) {
-        return false;
+        switch (tokens[0].toUpperCase()) {
+            case "CREATE":
+                if (tokens.length < 2) {
+                    out.writeObject("NOK");
+                    return;
+                }
+                create(u, tokens[1], out);
+                break;
+            case "ADD":
+                if (tokens.length < 4) {
+                    out.writeObject("NOK");
+                    return;
+                }
+                add(u, tokens[1], tokens[2], tokens[3], out);
+                break;
+            case "RD":
+                if (tokens.length < 3) {
+                    out.writeObject("NOK");
+                    return;
+                }
+                rd(u, tokens[1], tokens[2], out);
+                break;
+            case "EC":
+                if (tokens.length < 4) {
+                    out.writeObject("NOK");
+                    return;
+                }
+                ec(u, tokens[1], tokens[2], Integer.parseInt(tokens[3]), out);
+                break;
+            case "RT":
+                if (tokens.length < 2) {
+                    out.writeObject("NOK");
+                    return;
+                }
+                rt(u, tokens[1], out);
+                break;
+            case "RH":
+                if (tokens.length < 3) {
+                    out.writeObject("NOK");
+                    return;
+                }
+                rh(u, tokens[1], tokens[2], out);
+                break;
+            default:
+                out.writeObject("NOK");
+                break;
+        }
     }
 
     private static class ClientHandler extends Thread {
         private Socket socket;
         private ObjectOutputStream out;
         private ObjectInputStream in;
-        private String loggedUser;
+        private User loggedUser;
 
-        int max_attempts = 3;
+        private static final int max_attempts = 3;
 
         public ClientHandler(Socket socket) {
             this.socket = socket;
+        }
+
+        // processa a string
+        // ve se o utilizador existe. se sim, ve se a pass tem match
+        // senao cria novo registo
+        // retorna user e escreve no out
+        private static synchronized User authenticate(String composta, ObjectOutputStream out) throws IOException {
+            String[] tokens = composta.trim().split("\\s+");
+
+            if (tokens.length < 2) {
+                return null;
+            }
+
+            if (catalogoUsers.exists(tokens[0])) {
+                if (catalogoUsers.authenticate(tokens[0], tokens[1])) {
+                    out.writeObject("OK-USER");
+                    return catalogoUsers.getWithNome(tokens[0]);
+                }
+                out.writeObject("WRONG-PWD");
+                return null;
+            }
+
+            catalogoUsers.addUser(tokens[0], tokens[1]);
+            out.writeObject("OK-NEW-USER");
+            return catalogoUsers.getWithNome(tokens[0]);
         }
 
         @Override
@@ -112,7 +255,6 @@ public class SpertaServer {
             try {
                 out = new ObjectOutputStream(socket.getOutputStream());
                 in = new ObjectInputStream(socket.getInputStream());
-
 
                 // atestacao
                 long clientSize = in.readLong();
@@ -127,29 +269,33 @@ public class SpertaServer {
                 // auth loop
                 for (int i = 0; i < max_attempts; i++) {
                     String auth = (String) in.readObject();
-                    boolean result = authenticate(auth);
+                    User result = authenticate(auth, out);
 
-                    if (result) {
+                    if (result != null) {
+                        loggedUser = result;
                         break;
                     }
                 }
 
                 // disconnect se excedeu max attempts
-                if(loggedUser == null) {
+                if (loggedUser == null) {
+                    out.writeObject("TOO-MANY-ATTEMPTS");
                     socket.close();
+                    return;
                 }
 
                 // command loop
-                //TODO
-                
+                String command;
+                while ((command = (String) in.readObject()) != null) {
+                    proccessCommand(command, loggedUser, out);
+                    out.flush();
+                }
 
             } catch (EOFException e) {
-                //TODO cliente desconectou bem
-            } 
-            catch (Exception e) {
+                // TODO cliente desconectou bem
+            } catch (Exception e) {
                 // TODO
-            }
-            finally {
+            } finally {
                 try {
                     socket.close();
                 } catch (IOException e) {
