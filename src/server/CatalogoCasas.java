@@ -30,6 +30,7 @@ public class CatalogoCasas {
         }
         Casa c = new Casa(id, owner);
         tabela.put(id, c);
+        saveCasa(c);
         return true;
     }
 

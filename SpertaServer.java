@@ -141,7 +141,6 @@ public class SpertaServer {
         } catch (IllegalArgumentException e) {
             out.writeObject("NOK");
         }
-
     }
 
     // envia ao cliente um .txt contendo todos os ultimos comandos dos aparelhos da
@@ -170,7 +169,7 @@ public class SpertaServer {
         }
 
         if (sb.length() == 0) {
-            out.writeObject("NOPERM");
+            out.writeObject("NOPERM"); //TODO ver se é NODATA
             return;
         }
 
@@ -250,7 +249,11 @@ public class SpertaServer {
                     out.writeObject("NOK");
                     return;
                 }
-                ec(u, tokens[1], tokens[2], Integer.parseInt(tokens[3]), out);
+                try {
+                    ec(u, tokens[1], tokens[2], Integer.parseInt(tokens[3]), out);
+                } catch (NumberFormatException e) {
+                    out.writeObject("NOK");
+                }
                 break;
             case "RT":
                 if (tokens.length < 2) {
@@ -353,14 +356,16 @@ public class SpertaServer {
                 }
 
             } catch (EOFException e) {
-                // TODO cliente desconectou bem
+                System.out.println(
+                        "Cliente " + (loggedUser != null ? loggedUser.nome : "desconhecido") + " desconectou-se.");
             } catch (Exception e) {
-                // TODO
+                System.err.println("Erro com cliente " + (loggedUser != null ? loggedUser.nome : "desconhecido") + ": "
+                        + e.getMessage());
             } finally {
                 try {
                     socket.close();
                 } catch (IOException e) {
-                    // TODO
+                    System.err.println("Erro ao fechar socket: " + e.getMessage());
                 }
             }
         }

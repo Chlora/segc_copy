@@ -11,7 +11,7 @@ public class LogGlobalAparelhos {
     private static final File f = new File("ficheiros/logs/global.txt");
     private static final DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    public static void init() {
+    private static void init() {
         f.getParentFile().mkdirs();
         if (!f.exists()) {
             try {
