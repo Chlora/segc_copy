@@ -4,15 +4,18 @@ import java.io.*;
 import java.util.HashMap;
 import java.util.Collection;
 import java.util.Map;
+import java.util.ArrayList;
 
 public class CatalogoUsers {
 
     private Map<String, User> tabela;
+    private ArrayList<User> autenticados;
 
     private static final File f = new File("ficheiros/users.txt");
 
     public CatalogoUsers() {
         tabela = new HashMap<>();
+        autenticados = new ArrayList<User>();
         loadFromFile();
     }
 
@@ -76,5 +79,17 @@ public class CatalogoUsers {
         } catch (IOException e) {
             System.err.println("Erro a gravar users: " + e.getMessage());
         }
+    }
+
+    public synchronized boolean isUserAuthenticated(User u) {
+        return autenticados.contains(u);
+    }
+
+    public synchronized void registerAuth(User u) {
+        autenticados.add(u);
+    }
+
+    public synchronized void unregisterAuth(User u) {
+        autenticados.remove(u);
     }
 }

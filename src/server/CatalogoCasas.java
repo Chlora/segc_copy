@@ -140,9 +140,10 @@ public class CatalogoCasas {
 
     public synchronized void saveCasa(Casa c) {
         File casaDir = new File(ROOT_DIR, c.id);
-        if (!casaDir.exists())
+        if (!casaDir.exists()) {
             casaDir.mkdirs();
-
+        }
+            
         // info.txt
         File infoFile = new File(casaDir, "info.txt");
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(infoFile))) {

@@ -1,3 +1,5 @@
-unitTests/TestCasaOperations.java
-.vscode/launch.json
-/ficheiros/
+unitTests/
+.vscode/
+ficheiros/
+ficheirosRecebidos/
+out/
