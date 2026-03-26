@@ -50,22 +50,38 @@ public class SpertaClient {
             printMenu();
 
             while (true) {
-                System.out.print("> ");
+                System.out.print("Comando: ");
                 String command = scanner.nextLine().trim();
                 
                 if (command.isEmpty()) continue;
 
+                // Envia o comando original para o servidor
                 out.writeObject(command);
                 String response = (String) in.readObject();
-                System.out.println("Resposta: " + response);
 
-                // Se o comando for RT ou RH e a resposta foi OK, receber ficheiro
-                if ((command.startsWith("RT") || command.startsWith("RH")) && response.equals("OK")) {
+                // Usamos uma versão em maiúsculas apenas para as validações locais no cliente
+                String cmdUpper = command.toUpperCase();
+
+                // Se o comando for RT ou RH e a resposta foi OK, ler o ficheiro
+                if ((cmdUpper.startsWith("RT") || cmdUpper.startsWith("RH")) && response.equals("OK")) {
                     long fileSize = in.readLong();
-                    System.out.println("Recebendo ficheiro de tamanho: " + fileSize + " bytes.");
                     byte[] fileData = (byte[]) in.readObject();
-                    // TODO: Guardar fileData localmente usando FileOutputStream
-                    System.out.println("Ficheiro guardado com sucesso.");
+                    
+                    // Imprime exatamente como no enunciado!
+                    System.out.println("Resposta: OK, " + fileSize + " (long), seguido de " + fileSize + " bytes de dados.");
+
+                    // Guardar o ficheiro localmente
+                    String[] parts = command.split(" ");
+                    String filename = cmdUpper.startsWith("RT") ? parts[1] + "_estados.txt" : parts[1] + "_" + parts[2].toUpperCase() + ".csv";
+                    
+                    try (FileOutputStream fos = new FileOutputStream(filename)) {
+                        fos.write(fileData);
+                    } catch (IOException e) {
+                        System.out.println("Erro ao gravar ficheiro local: " + e.getMessage());
+                    }
+                } else {
+                    // Imprime a resposta normal (NOK, NOD, NOPERM, etc)
+                    System.out.println("Resposta: " + response);
                 }
             }
 

@@ -126,7 +126,7 @@ public class CatalogoCasas {
 
                 // 4. aparelho by index
                 for (int i = 1; i <= counter; i++) {
-                    File deviceFile = new File(seccaoDir, p.name() + i + ".txt");
+                    File deviceFile = new File(seccaoDir, p.name() + i + ".csv");
                     casa.addAparelho(p, 0, deviceFile);
                 }
 

@@ -19,6 +19,24 @@ public class Casa {
         tabelaPermissoes.put(owner, EnumSet.of(Permissao.owner));
     }
 
+    // CORREÇÃO: LÓGICA DE SUBSTITUIÇÃO DO 'ALL' (Ponto 4)
+    public synchronized void givePerms(User user, Permissao p) {
+        if (!this.tabelaPermissoes.containsKey(user)) {
+            this.tabelaPermissoes.put(user, EnumSet.of(p));
+            return;
+        }
+
+        EnumSet<Permissao> perms = this.tabelaPermissoes.get(user);
+        
+        if (p == Permissao.all) {
+            perms.clear(); // Limpa M, L, etc
+            perms.add(Permissao.all);
+        } else {
+            perms.remove(Permissao.all); // Se der permissão especifica, remove o all
+            perms.add(p);
+        }
+    }
+
     public synchronized void givePerms(User user, EnumSet<Permissao> p) {
         if (!this.tabelaPermissoes.containsKey(user)) {
             this.tabelaPermissoes.put(user, p);
@@ -28,14 +46,7 @@ public class Casa {
         this.tabelaPermissoes.get(user).addAll(p);
     }
 
-    public synchronized void givePerms(User user, Permissao p) {
-        if (!this.tabelaPermissoes.containsKey(user)) {
-            this.tabelaPermissoes.put(user, EnumSet.of(p));
-            return;
-        }
-
-        this.tabelaPermissoes.get(user).add(p);
-    }
+    
 
     public synchronized boolean addSeccao(Permissao p) {
         if (tabelaSeccoes.containsKey(p)) {
@@ -54,7 +65,7 @@ public class Casa {
         }
 
         File f = new File("ficheiros/casas/" + this.id + "/" + p.name() + "/" + p.name()
-                + (tabelaSeccoes.get(p).getAparelhoCount() + 1) + ".txt");
+                + (tabelaSeccoes.get(p).getAparelhoCount() + 1) + ".csv");
 
         tabelaSeccoes.get(p).addAparelho(f);
         return true;
@@ -66,7 +77,7 @@ public class Casa {
         }
 
         File f = new File("ficheiros/casas/" + this.id + "/" + p.name() + "/" + p.name()
-                + (tabelaSeccoes.get(p).getAparelhoCount() + 1) + ".txt");
+                + (tabelaSeccoes.get(p).getAparelhoCount() + 1) + ".csv");
 
         tabelaSeccoes.get(p).addAparelho(estado, f);
         return true;

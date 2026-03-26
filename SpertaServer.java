@@ -44,6 +44,25 @@ public class SpertaServer {
         }
     }
 
+    // LÊ O FICHEIRO DE ATESTAÇÃO (Correção do Ponto 5)
+    private static long getExpectedClientSize() {
+        File f = new File("ficheiros/atestacao.txt");
+        if (!f.exists()) {
+            try {
+                f.getParentFile().mkdirs();
+                try (PrintWriter pw = new PrintWriter(f)) { pw.println("SpertaClient:2734"); }
+            } catch (Exception e) {}
+            return 2734L;
+        }
+        try (BufferedReader br = new BufferedReader(new FileReader(f))) {
+            String line = br.readLine();
+            if (line != null && line.contains(":")) {
+                return Long.parseLong(line.split(":")[1].trim());
+            }
+        } catch (Exception e) {}
+        return 2734L;
+    }
+
     // cria casa
     private static void create(User u, String hm, ObjectOutputStream out) throws IOException {
         if (catalogoCasas.addCasa(hm, u)) {
@@ -117,12 +136,7 @@ public class SpertaServer {
             out.writeObject("NOHM");
             return;
         }
-
-        if (!c.ExisteAparelho(d)) {
-            out.writeObject("NOD");
-            return;
-        }
-
+        
         try {
             Permissao p = Permissao.valueOf(String.valueOf(d.charAt(0)));
 
@@ -130,6 +144,11 @@ public class SpertaServer {
                 out.writeObject("NOPERM");
                 return;
             }
+
+            if (!c.ExisteAparelho(d)) {
+            out.writeObject("NOD");
+            return;
+        }
 
             if (!c.changeEstado(d, v)) {
                 out.writeObject("NOK");
@@ -146,37 +165,71 @@ public class SpertaServer {
     // envia ao cliente um .txt contendo todos os ultimos comandos dos aparelhos da
     // casa hm
     // TODO
+    // private static void rt(User u, String hm, ObjectOutputStream out) throws IOException {
+    //     Casa c = catalogoCasas.getWithId(hm);
+
+    //     if (c == null) {
+    //         out.writeObject("NOHM");
+    //         return;
+    //     }
+
+    //     StringBuilder sb = new StringBuilder();
+
+    //     for (Map.Entry<Permissao, Seccao> entry : c.getSeccoes().entrySet()) {
+    //         if (!c.UserTemPermParaSeccao(u, entry.getKey())) {
+    //             continue;
+    //         }
+
+    //         Seccao s = entry.getValue();
+    //         for (int i = 1; i <= s.getAparelhoCount(); i++) {
+    //             String deviceId = entry.getKey().name() + i;
+    //             sb.append(deviceId).append(":").append(s.GetUltimoEstado(i)).append("\n");
+    //         }
+    //     }
+
+    //     if (sb.length() == 0) {
+    //         out.writeObject("NOPERM"); //TODO ver se é NODATA
+    //         return;
+    //     }
+
+    //     byte[] data = sb.toString().getBytes();
+    //     out.writeObject("OK");
+    //     out.writeLong(data.length);
+    //     out.write(data);
+    // }
+
+    // CORREÇÃO: writeObject EM VEZ DE write PARA EVITAR ERRO DE CONEXÃO (Ponto 1)
     private static void rt(User u, String hm, ObjectOutputStream out) throws IOException {
         Casa c = catalogoCasas.getWithId(hm);
 
-        if (c == null) {
+        if (c == null) { 
             out.writeObject("NOHM");
+            return; 
+        }
+
+        if (!c.getPermissoes().containsKey(u)){ 
+            out.writeObject("NOPERM"); 
             return;
         }
 
         StringBuilder sb = new StringBuilder();
-
         for (Map.Entry<Permissao, Seccao> entry : c.getSeccoes().entrySet()) {
-            if (!c.UserTemPermParaSeccao(u, entry.getKey())) {
-                continue;
-            }
-
+            if (!c.UserTemPermParaSeccao(u, entry.getKey())) continue;
             Seccao s = entry.getValue();
             for (int i = 1; i <= s.getAparelhoCount(); i++) {
-                String deviceId = entry.getKey().name() + i;
-                sb.append(deviceId).append(":").append(s.GetUltimoEstado(i)).append("\n");
+                sb.append(entry.getKey().name()).append(i).append(":").append(s.GetUltimoEstado(i)).append("\n");
             }
         }
 
-        if (sb.length() == 0) {
-            out.writeObject("NOPERM"); //TODO ver se é NODATA
-            return;
+        if (sb.length() == 0){ 
+            out.writeObject("NODATA"); 
+            return; 
         }
 
         byte[] data = sb.toString().getBytes();
         out.writeObject("OK");
         out.writeLong(data.length);
-        out.write(data);
+        out.writeObject(data); // <-- CORREÇÃO 1
     }
 
     // da ao cliente o log do dispositivo d da casa hm
@@ -200,7 +253,7 @@ public class SpertaServer {
             return;
         }
 
-        File logFile = new File("ficheiros/casas/" + hm + "/" + d.charAt(0) + "/" + d + ".txt");
+        File logFile = new File("ficheiros/casas/" + hm + "/" + d.charAt(0) + "/" + d + ".csv");
 
         if (!logFile.exists() || logFile.length() == 0) {
             out.writeObject("NODATA");
@@ -214,7 +267,7 @@ public class SpertaServer {
 
         out.writeObject("OK");
         out.writeLong(data.length);
-        out.write(data);
+        out.writeObject(data); // <-- CORREÇÃO 1
     }
 
     // processa a string de comando, faz validacoes, e chama um dos metodos acima
@@ -322,6 +375,9 @@ public class SpertaServer {
 
                 // atestacao
                 long clientSize = in.readLong();
+                long expected = getExpectedClientSize(); // <-- CORREÇÃO 5
+
+
                 if (clientSize == EXPECTED_CLIENT_SIZE) {
                     out.writeObject("ATTESTATION_OK");
                 } else {
