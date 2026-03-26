@@ -37,15 +37,25 @@ public class SpertaClient {
                 return;
             }
 
-            // 2. Autenticação
-            out.writeObject(userId + " " + password);
-            String authResponse = (String) in.readObject();
-            System.out.println(authResponse);
+            boolean authenticated = false;
+            String currentPassword = password;
 
-            if (authResponse.equals("WRONG-PWD")) {
-                return;
+            while (!authenticated) {
+                out.writeObject(userId + " " + currentPassword);
+                String authResponse = (String) in.readObject();
+
+                if (authResponse.equals("OK-USER") || authResponse.equals("OK-NEW-USER")) {
+                    System.out.println(authResponse);
+                    authenticated = true;
+                } else if (authResponse.equals("WRONG-PWD")) {
+                    System.out.println(authResponse);
+                    System.out.print("Password incorreta. Introduza nova password: ");
+                    currentPassword = scanner.nextLine().trim();
+                } else {
+                    System.out.println("Resposta de autenticação desconhecida. A terminar.");
+                    return;
+                }
             }
-
             // 3. Menu de Comandos
             printMenu();
 
