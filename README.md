@@ -43,6 +43,10 @@ Para limpar os ficheiros, executar na raiz do projeto:
 * RH <hm> <d># Receber o Histórico (ficheiro de log .csv) de comandos enviados ao dispositivo <d> da casa <hm>, desde que o utilizador tenha permissões
 
 
+Ficheiros do servidor são guardados na pasta ``/ficheiros/``
+Ficheiros recebidos pelo cliente são guardados na pasta ``/ficheirosRecebidos/``
+
+
 ## Limitações do projeto
 
 O projeto foi desenvolvido em Windows; os ficheiros criados pelo servidor podem apresentar problemas de permissões quando o programa é executado em sistemas Linux.
