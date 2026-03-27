@@ -1,45 +1,39 @@
-# SegC-18
-
-## 📋 Requisitos
-
-* Java: Versão 21 ou superior.
-* Maven(Opcional):  Apache Maven para compilação.
-
+SegC-18
 ==============================
-▶️ Como executar
-==============================
+
+## Requisitos
+
+* JDK & java 21
+* Maven (para compilação; opcional)
+
+
+## Como executar
 
 **Observação**: O servidor deve ser iniciado antes do cliente.
 
 ### Usando o JAR (Recomendado)
-Se o ficheiro JAR já estiver disponível na pasta `target`, não é necessário usar o Maven. 
+Se o ficheiro JAR já estiver disponível na pasta `target`, não é necessário usar o Maven e com. 
 *(Nota: É necessário utilizar o nome completo da classe, incluindo o package).*
 
 **1. Executar o Servidor:**
-``bash
-java -jar target/server.jar [port]
+java -jar server/target/sperta-server.jar [port]
 
 **2. Executar o Cliente:**
-``bash
-java -jar target/client.jar [IP:port] [username] [password]
+java -jar client/target/sperta-client.jar [IP:port] [username] [password]
 
 
-==============================
-🛠️ Como Compilar o Projeto com Maven
-==============================
+## Como compilar
 
-Caso seja necessário gerar o ficheiro JAR novamente, execute na raiz do projeto:
+Caso seja necessário gerar os ficheiros JAR novamente, execute na raiz do projeto:
 
-``bash
-# Limpa ficheiros de compilações anteriores (opcional, mas recomendado)
-mvn clean
-# Compila o código e empacota-o num ficheiro JAR
-mvn package
+``mvn package``
+
+Para limpar os ficheiros, executar na raiz do projeto:
+
+``mvn clean``
 
 
-==============================
-📌 Funcionalidades
-==============================
+## Funcionalidades
 
 * CREATE <hm> # Criar casa <hm> - utilizador é Owner
 * ADD <user1> <hm> <s> # Adicionar utilizador <user1> à casa <hm>, seção <s>
@@ -49,16 +43,12 @@ mvn package
 * RH <hm> <d># Receber o Histórico (ficheiro de log .csv) de comandos enviados ao dispositivo <d> da casa <hm>, desde que o utilizador tenha permissões
 
 
-==============================
-⚠️ Limitações do projeto
-==============================
+## Limitações do projeto
 
 O projeto foi desenvolvido em Windows; os ficheiros criados pelo servidor podem apresentar problemas de permissões quando o programa é executado em sistemas Linux.
 
 
-==============================
-👥 Autores
-==============================
+## Autores
 
 * Jin Zhengrong FC61808
 * Rodrigo Santos FC61825

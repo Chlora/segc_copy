@@ -2,4 +2,4 @@ unitTests/
 .vscode/
 ficheiros/
 ficheirosRecebidos/
-out/
+target/
