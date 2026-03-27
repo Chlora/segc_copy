@@ -1,0 +1,11 @@
+server\SpertaServer$ClientHandler.class
+server\SpertaServer.class
+server\User.class
+server\Aparelho.class
+server\Casa.class
+server\CatalogoCasas.class
+server\LogGlobalAparelhos.class
+server\CatalogoUsers.class
+server\Seccao.class
+client\SpertaClient.class
+server\Permissao.class
