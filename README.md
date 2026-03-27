@@ -17,11 +17,11 @@ Se o ficheiro JAR já estiver disponível na pasta `target`, não é necessário
 
 **1. Executar o Servidor:**
 ``bash
-java -cp target/sperta-project-1.0-SNAPSHOT.jar server.SpertaServer [port]
+java -jar target/server.jar [port]
 
 **2. Executar o Cliente:**
 ``bash
-java -cp target/sperta-project-1.0-SNAPSHOT.jar client.SpertaClient [IP:port] [username] [password]
+java -jar target/client.jar [IP:port] [username] [password]
 
 
 ==============================
