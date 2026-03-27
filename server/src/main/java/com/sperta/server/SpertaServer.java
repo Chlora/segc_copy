@@ -158,11 +158,8 @@ public class SpertaServer {
         }
     }
 
-<<<<<<< HEAD:src/main/java/server/SpertaServer.java
 
-=======
-    // CORREÇÃO: writeObject EM VEZ DE write PARA EVITAR ERRO DE CONEXÃO (Ponto 1)
->>>>>>> f399af0ae80025410553be6077f6deac69744536:server/src/main/java/com/sperta/server/SpertaServer.java
+
     private static void rt(User u, String hm, ObjectOutputStream out) throws IOException {
         Casa c = catalogoCasas.getWithId(hm);
 
@@ -353,11 +350,7 @@ public class SpertaServer {
 
                 // atestacao
                 long clientSize = in.readLong();
-<<<<<<< HEAD:src/main/java/server/SpertaServer.java
                 long expected = getExpectedClientSize();
-=======
-                long expected = getExpectedClientSize(); // <-- CORREÇÃO 5 
->>>>>>> f399af0ae80025410553be6077f6deac69744536:server/src/main/java/com/sperta/server/SpertaServer.java
 
 
                 if (clientSize == expected) {
