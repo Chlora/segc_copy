@@ -60,7 +60,7 @@ public class SpertaClient {
                 if (authResponse.equals("OK-USER") || authResponse.equals("OK-NEW-USER")) {
                     authenticated = true;
                 } else if (authResponse.equals("TOO-MANY-ATTEMPTS")) {
-                    System.out.println("Demasiadas tentativas falhadas de conexão. A terminar...");
+                    System.out.println("Demasiadas tentativas falhadas de conexao. A terminar...");
                     return;
                 } else if (authResponse.equals("WRONG-PWD")) {
                     System.out.print("Password incorreta. Introduza nova password: ");
@@ -69,7 +69,7 @@ public class SpertaClient {
                     System.out.println("Utilizador já logado noutro cliente. A terminar...");
                     return;
                 } else {
-                    System.out.println("Resposta de autenticação desconhecida. A terminar...");
+                    System.out.println("Resposta de autenticacao desconhecida. A terminar...");
                     return;
                 }
             }
@@ -81,22 +81,19 @@ public class SpertaClient {
                 System.out.print("Comando: ");
                 String command = scanner.nextLine().trim();
 
-                if (command.isEmpty())
+                if (command.isEmpty()){
                     continue;
+                }
 
-                // Envia o comando original para o servidor
                 out.writeObject(command);
                 String response = (String) in.readObject();
 
-                // Usamos uma versão em maiúsculas apenas para as validações locais no cliente
                 String cmdUpper = command.toUpperCase();
 
-                // Se o comando for RT ou RH e a resposta foi OK, ler o ficheiro
                 if ((cmdUpper.startsWith("RT") || cmdUpper.startsWith("RH")) && response.equals("OK")) {
                     long fileSize = in.readLong();
                     byte[] fileData = (byte[]) in.readObject();
 
-                    // Imprime
                     System.out.println(
                             "Resposta: OK, " + fileSize + " (long), seguido de " + fileSize + " bytes de dados.");
 
@@ -111,15 +108,14 @@ public class SpertaClient {
                         System.out.println("Erro ao gravar ficheiro local: " + e.getMessage());
                     }
                 } else {
-                    // Imprime a resposta normal (NOK, NOD, NOPERM, etc)
                     System.out.println("Resposta: " + response);
                 }
             }
 
         } catch (NoSuchElementException e) {
-            System.out.println("A terminar..."); // scanner lanca no line found no ctrl+c
+            System.out.println("A terminar..."); 
         } catch (Exception e) {
-            System.err.println("Erro na conexão: " + e.getMessage());
+            System.err.println("Erro na conexao: " + e.getMessage());
         }
 
         System.exit(0); // previne um erro no too many attempts
@@ -128,10 +124,10 @@ public class SpertaClient {
     private static void printMenu() {
         System.out.println("\n--- Comandos Disponíveis ---");
         System.out.println("CREATE <hm>            # Criar casa <hm>");
-        System.out.println("ADD <user1> <hm> <s>   # Adicionar utilizador <user1> à casa <hm>, seção <s>");
+        System.out.println("ADD <user1> <hm> <s>   # Adicionar utilizador <user1> à casa <hm>, secao <s>");
         System.out.println("RD <hm> <s>            # Registar um Dispositivo");
-        System.out.println("EC <hm> <d> <int>      # Enviar valor <int> de estado/temporização");
-        System.out.println("RT <hm>                # Receber informação sobre último comando");
+        System.out.println("EC <hm> <d> <int>      # Enviar valor <int> de estado/temporizacao");
+        System.out.println("RT <hm>                # Receber informacao sobre último comando");
         System.out.println("RH <hm> <d>            # Receber o Histórico (ficheiro de log.csv)");
         System.out.println("Pressione CTRL+C para sair.\n");
     }

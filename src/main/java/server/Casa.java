@@ -19,7 +19,6 @@ public class Casa {
         tabelaPermissoes.put(owner, EnumSet.of(Permissao.owner));
     }
 
-    // CORREÇÃO: LÓGICA DE SUBSTITUIÇÃO DO 'ALL' (Ponto 4)
     public synchronized void givePerms(User user, Permissao p) {
         if (!this.tabelaPermissoes.containsKey(user)) {
             this.tabelaPermissoes.put(user, EnumSet.of(p));
@@ -29,10 +28,10 @@ public class Casa {
         EnumSet<Permissao> perms = this.tabelaPermissoes.get(user);
         
         if (p == Permissao.all) {
-            perms.clear(); // Limpa M, L, etc
+            perms.clear();
             perms.add(Permissao.all);
         } else {
-            perms.remove(Permissao.all); // Se der permissão especifica, remove o all
+            perms.remove(Permissao.all); 
             perms.add(p);
         }
     }

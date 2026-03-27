@@ -37,7 +37,6 @@ public class SpertaServer {
         }
     }
 
-    // LÊ O FICHEIRO DE ATESTAÇÃO (Correção do Ponto 5)
     private static long getExpectedClientSize() {
         File f = new File("ficheiros/atestacao.txt");
         if (!f.exists()) {
@@ -91,7 +90,7 @@ public class SpertaServer {
             Permissao p = Permissao.valueOf(s);
             c.givePerms(uToAdd, p);
             catalogoCasas.saveCasa(c);
-            System.out.println("Utilizador " + u.nome + " deu permissão a " + s + " na casa " + hm + " com sucesso\n");
+            System.out.println("Utilizador " + u.nome + " deu permissao a " + s + " na casa " + hm + " com sucesso\n");
             out.writeObject("OK");
         } catch (IllegalArgumentException e) {
             out.writeObject("NOK");
@@ -117,7 +116,7 @@ public class SpertaServer {
 
             c.addAparelho(p);
             catalogoCasas.saveCasa(c);
-            System.out.println("Utilizador " + u.nome + " registou aparelho na secção " + s + " na casa " + hm + " com sucesso\n");
+            System.out.println("Utilizador " + u.nome + " registou aparelho na seccao " + s + " na casa " + hm + " com sucesso\n");
             out.writeObject("OK");
         } catch (IllegalArgumentException e) {
             out.writeObject("NOK");
@@ -159,43 +158,7 @@ public class SpertaServer {
         }
     }
 
-    // envia ao cliente um .txt contendo todos os ultimos comandos dos aparelhos da
-    // casa hm
-    // TODO
-    // private static void rt(User u, String hm, ObjectOutputStream out) throws IOException {
-    //     Casa c = catalogoCasas.getWithId(hm);
 
-    //     if (c == null) {
-    //         out.writeObject("NOHM");
-    //         return;
-    //     }
-
-    //     StringBuilder sb = new StringBuilder();
-
-    //     for (Map.Entry<Permissao, Seccao> entry : c.getSeccoes().entrySet()) {
-    //         if (!c.UserTemPermParaSeccao(u, entry.getKey())) {
-    //             continue;
-    //         }
-
-    //         Seccao s = entry.getValue();
-    //         for (int i = 1; i <= s.getAparelhoCount(); i++) {
-    //             String deviceId = entry.getKey().name() + i;
-    //             sb.append(deviceId).append(":").append(s.GetUltimoEstado(i)).append("\n");
-    //         }
-    //     }
-
-    //     if (sb.length() == 0) {
-    //         out.writeObject("NOPERM"); //TODO ver se é NODATA
-    //         return;
-    //     }
-
-    //     byte[] data = sb.toString().getBytes();
-    //     out.writeObject("OK");
-    //     out.writeLong(data.length);
-    //     out.write(data);
-    // }
-
-    // CORREÇÃO: writeObject EM VEZ DE write PARA EVITAR ERRO DE CONEXÃO (Ponto 1)
     private static void rt(User u, String hm, ObjectOutputStream out) throws IOException {
         Casa c = catalogoCasas.getWithId(hm);
 
@@ -226,7 +189,7 @@ public class SpertaServer {
         byte[] data = sb.toString().getBytes();
         out.writeObject("OK");
         out.writeLong(data.length);
-        out.writeObject(data); // <-- CORREÇÃO 1
+        out.writeObject(data); 
     }
 
     // da ao cliente o log do dispositivo d da casa hm
@@ -264,7 +227,7 @@ public class SpertaServer {
 
         out.writeObject("OK");
         out.writeLong(data.length);
-        out.writeObject(data); // <-- CORREÇÃO 1
+        out.writeObject(data);
     }
 
     // processa a string de comando, faz validacoes, e chama um dos metodos acima
@@ -386,7 +349,7 @@ public class SpertaServer {
 
                 // atestacao
                 long clientSize = in.readLong();
-                long expected = getExpectedClientSize(); // <-- CORREÇÃO 5 | TODO isto serve para q exatamente?
+                long expected = getExpectedClientSize();
 
 
                 if (clientSize == EXPECTED_CLIENT_SIZE) {
@@ -410,7 +373,7 @@ public class SpertaServer {
 
                 // disconnect se excedeu max attempts
                 if (loggedUser == null) {
-                    System.out.println("Um utilizador tentou autenticar demasiadas vezes. A fechar a ligação...\n");
+                    System.out.println("Um utilizador tentou autenticar demasiadas vezes. A fechar a ligacao...\n");
                     socket.close();
                     return;
                 }
