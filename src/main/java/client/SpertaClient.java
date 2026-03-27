@@ -1,4 +1,5 @@
-package src.client;
+package client;
+
 import java.io.*;
 import java.net.*;
 import java.time.format.DateTimeFormatter;

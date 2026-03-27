@@ -1,4 +1,4 @@
-package src.server;
+package server;
 
 import java.util.EnumSet;
 import java.util.HashMap;
