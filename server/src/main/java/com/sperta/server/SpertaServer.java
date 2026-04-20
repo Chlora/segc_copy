@@ -4,6 +4,10 @@ import java.io.*;
 import java.net.*;
 import java.util.Map;
 
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
+import javax.net.ssl.SSLSocket;
+
 public class SpertaServer {
     private static final int DEFAULT_PORT = 22345;
     private static final long EXPECTED_CLIENT_SIZE = 2734L;
@@ -11,7 +15,16 @@ public class SpertaServer {
     private static CatalogoUsers catalogoUsers;
     private static CatalogoCasas catalogoCasas;
 
+    private static java.security.PrivateKey serverPrivateKey;
+    private static String expectedClientHash;
+
     public static void main(String[] args) {
+
+        if (args.length < 4) {
+            System.err.println("Uso: SpertaServer <port> <password-cifra> <keystore> <password-keystore>");
+            return;
+        }
+
         int port = DEFAULT_PORT;
         if (args.length > 0) {
             try {
@@ -21,16 +34,61 @@ public class SpertaServer {
             }
         }
 
-        catalogoUsers = new CatalogoUsers();
-        catalogoCasas = new CatalogoCasas(catalogoUsers);
+        String cipherPassword = args[1];
+        String keystorePath = args[2];
+        String keystorePassword = args[3];
 
-        System.out.println("SpertaServer a iniciar no porto " + port + "...");
+        if (cipherPassword == null || cipherPassword.isEmpty()) {
+            System.err.println("Password de cifra invalida");
+            return;
+        }
 
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            while (true) {
-                Socket clientSocket = serverSocket.accept();
-                System.out.println("Novo cliente: " + clientSocket.getInetAddress());
-                new ClientHandler(clientSocket).start();
+        if (keystorePath == null || keystorePath.isEmpty()) {
+            System.err.println("Keystore path invalido");
+            return;
+        }
+
+        if (keystorePassword == null || keystorePassword.isEmpty()) {
+            System.err.println("Keystore password invalido");
+            return;
+        }
+
+        File ks = new File(keystorePath);
+        if (!ks.exists()) {
+            System.err.println("Keystore nao encontrado: " + keystorePath);
+            return;
+        }
+
+        System.setProperty("javax.net.ssl.keyStore", keystorePath);
+        System.setProperty("javax.net.ssl.keyStorePassword", keystorePassword);
+
+        try {
+
+            try {
+                catalogoUsers = new CatalogoUsers(cipherPassword);
+                catalogoCasas = new CatalogoCasas(catalogoUsers, cipherPassword);
+                loadAttestationInfo();
+            } catch (IntegrityException e) {
+                System.out.println("NOK-INTEGRITY");
+                System.exit(1);
+            }
+
+            System.out.println("SpertaServer a iniciar no porto " + port + "...");
+
+            SSLServerSocketFactory ssf = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
+
+            try (SSLServerSocket serverSocket = (SSLServerSocket) ssf.createServerSocket(port)) {
+
+                serverSocket.setNeedClientAuth(false);
+
+                while (true) {
+                    try {
+                        SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
+                        new ClientHandler(clientSocket, cipherPassword).start();
+                    } catch (IOException e) {
+                        System.err.println("Erro ao aceitar conexao: " + e.getMessage());
+                    }
+                }
             }
         } catch (IOException e) {
             System.err.println("Erro no servidor: " + e.getMessage());
@@ -42,8 +100,11 @@ public class SpertaServer {
         if (!f.exists()) {
             try {
                 f.getParentFile().mkdirs();
-                try (PrintWriter pw = new PrintWriter(f)) { pw.println("SpertaClient:2734"); }
-            } catch (Exception e) {}
+                try (PrintWriter pw = new PrintWriter(f)) {
+                    pw.println("SpertaClient:2734");
+                }
+            } catch (Exception e) {
+            }
             return 2734L;
         }
         try (BufferedReader br = new BufferedReader(new FileReader(f))) {
@@ -51,7 +112,8 @@ public class SpertaServer {
             if (line != null && line.contains(":")) {
                 return Long.parseLong(line.split(":")[1].trim());
             }
-        } catch (Exception e) {}
+        } catch (Exception e) {
+        }
         return 2734L;
     }
 
@@ -116,7 +178,8 @@ public class SpertaServer {
 
             c.addAparelho(p);
             catalogoCasas.saveCasa(c);
-            System.out.println("Utilizador " + u.nome + " registou aparelho na seccao " + s + " na casa " + hm + " com sucesso\n");
+            System.out.println(
+                    "Utilizador " + u.nome + " registou aparelho na seccao " + s + " na casa " + hm + " com sucesso\n");
             out.writeObject("OK");
         } catch (IllegalArgumentException e) {
             out.writeObject("NOK");
@@ -131,7 +194,7 @@ public class SpertaServer {
             out.writeObject("NOHM");
             return;
         }
-        
+
         try {
             Permissao p = Permissao.valueOf(String.valueOf(d.charAt(0)));
 
@@ -141,9 +204,9 @@ public class SpertaServer {
             }
 
             if (!c.ExisteAparelho(d)) {
-            out.writeObject("NOD");
-            return;
-        }
+                out.writeObject("NOD");
+                return;
+            }
 
             if (!c.changeEstado(d, v)) {
                 out.writeObject("NOK");
@@ -151,46 +214,46 @@ public class SpertaServer {
             }
 
             catalogoCasas.saveCasa(c);
-            System.out.println("Utilizador " + u.nome + " mudou o estado do dispositivo " + d + " para " + v + " com sucesso\n");
+            System.out.println(
+                    "Utilizador " + u.nome + " mudou o estado do dispositivo " + d + " para " + v + " com sucesso\n");
             out.writeObject("OK");
         } catch (IllegalArgumentException e) {
             out.writeObject("NOK");
         }
     }
 
-
-
     private static void rt(User u, String hm, ObjectOutputStream out) throws IOException {
         Casa c = catalogoCasas.getWithId(hm);
 
-        if (c == null) { 
+        if (c == null) {
             out.writeObject("NOHM");
-            return; 
+            return;
         }
 
-        if (!c.getPermissoes().containsKey(u)){ 
-            out.writeObject("NOPERM"); 
+        if (!c.getPermissoes().containsKey(u)) {
+            out.writeObject("NOPERM");
             return;
         }
 
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<Permissao, Seccao> entry : c.getSeccoes().entrySet()) {
-            if (!c.UserTemPermParaSeccao(u, entry.getKey())) continue;
+            if (!c.UserTemPermParaSeccao(u, entry.getKey()))
+                continue;
             Seccao s = entry.getValue();
             for (int i = 1; i <= s.getAparelhoCount(); i++) {
                 sb.append(entry.getKey().name()).append(i).append(":").append(s.GetUltimoEstado(i)).append("\n");
             }
         }
 
-        if (sb.length() == 0){ 
-            out.writeObject("NODATA"); 
-            return; 
+        if (sb.length() == 0) {
+            out.writeObject("NODATA");
+            return;
         }
 
         byte[] data = sb.toString().getBytes();
         out.writeObject("OK");
         out.writeLong(data.length);
-        out.writeObject(data); 
+        out.writeObject(data);
     }
 
     // da ao cliente o log do dispositivo d da casa hm
@@ -233,7 +296,8 @@ public class SpertaServer {
 
     // processa a string de comando, faz validacoes, e chama um dos metodos acima
     // TODO
-    private static void proccessCommand(String comando, User u, ObjectOutputStream out) throws IOException {
+    private static void proccessCommand(String comando, User u, String cipherPassword, ObjectOutputStream out)
+            throws IOException {
         String[] tokens = comando.trim().split("\\s+");
 
         switch (tokens[0].toUpperCase()) {
@@ -291,21 +355,24 @@ public class SpertaServer {
 
     private static class ClientHandler extends Thread {
         private Socket socket;
+        private String cipherPassword;
         private ObjectOutputStream out;
         private ObjectInputStream in;
         private User loggedUser;
 
         private static final int max_attempts = 3;
 
-        public ClientHandler(Socket socket) {
+        public ClientHandler(Socket socket, String cipherPassword) {
             this.socket = socket;
+            this.cipherPassword = cipherPassword;
         }
 
         // processa a string
         // ve se o utilizador existe. se sim, ve se a pass tem match
         // senao cria novo registo
         // retorna user e escreve no out
-        private static synchronized User authenticate(String composta, ObjectOutputStream out, int attempt) throws IOException {
+        private static synchronized User authenticate(String composta, ObjectOutputStream out, int attempt)
+                throws IOException {
             String[] tokens = composta.trim().split("\\s+");
 
             if (tokens.length < 2) {
@@ -352,7 +419,6 @@ public class SpertaServer {
                 long clientSize = in.readLong();
                 long expected = getExpectedClientSize();
 
-
                 if (clientSize == expected) {
                     out.writeObject("ATTESTATION_OK");
                 } else {
@@ -386,7 +452,7 @@ public class SpertaServer {
                 // command loop
                 String command;
                 while ((command = (String) in.readObject()) != null) {
-                    proccessCommand(command, loggedUser, out);
+                    proccessCommand(command, loggedUser, cipherPassword, out);
                     out.flush();
                 }
 
@@ -407,6 +473,25 @@ public class SpertaServer {
                     catalogoUsers.unregisterAuth(loggedUser);
                 }
             }
+        }
+    }
+
+    private static void loadServerPrivateKey(String ksPath, String ksPassword) throws Exception {
+        java.security.KeyStore ks = java.security.KeyStore.getInstance("JKS");
+        try (FileInputStream fis = new FileInputStream(ksPath)) {
+            ks.load(fis, ksPassword.toCharArray());
+        }
+        serverPrivateKey = (java.security.PrivateKey) ks.getKey("sperta", ksPassword.toCharArray());
+    }
+
+    private static void loadAttestationInfo() throws IntegrityException {
+        File f = new File("ficheiros/atestacao.txt");
+        try (BufferedReader br = new BufferedReader(new FileReader(f))) {
+            String line = br.readLine();
+            if (line != null && line.contains(":")) {
+                expectedClientHash = line.split(":")[1].trim();
+            }
+        } catch (IOException e) {
         }
     }
 }
