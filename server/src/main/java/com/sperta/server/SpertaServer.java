@@ -2,21 +2,33 @@ package com.sperta.server;
 
 import java.io.*;
 import java.net.*;
+import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.security.spec.KeySpec;
+import java.util.Arrays;
 import java.util.Map;
 
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 import javax.net.ssl.SSLSocket;
 
 public class SpertaServer {
     private static final int DEFAULT_PORT = 22345;
-    private static final long EXPECTED_CLIENT_SIZE = 2734L;
+    // private static final long EXPECTED_CLIENT_SIZE = 2734L;
 
     private static CatalogoUsers catalogoUsers;
     private static CatalogoCasas catalogoCasas;
 
-    private static java.security.PrivateKey serverPrivateKey;
-    private static String expectedClientHash;
+    private static String cipherPassword;
+    private static byte[] serverSalt;
 
     public static void main(String[] args) {
 
@@ -34,7 +46,7 @@ public class SpertaServer {
             }
         }
 
-        String cipherPassword = args[1];
+        cipherPassword = args[1];
         String keystorePath = args[2];
         String keystorePassword = args[3];
 
@@ -64,11 +76,12 @@ public class SpertaServer {
 
         try {
 
+            initializeSalt();
+
             try {
-                catalogoUsers = new CatalogoUsers(cipherPassword);
-                catalogoCasas = new CatalogoCasas(catalogoUsers, cipherPassword);
-                loadAttestationInfo();
-            } catch (IntegrityException e) {
+                catalogoUsers = new CatalogoUsers(cipherPassword, serverSalt);
+                catalogoCasas = new CatalogoCasas(catalogoUsers, cipherPassword, serverSalt);
+            } catch (Exception e) {
                 System.out.println("NOK-INTEGRITY");
                 System.exit(1);
             }
@@ -84,7 +97,8 @@ public class SpertaServer {
                 while (true) {
                     try {
                         SSLSocket clientSocket = (SSLSocket) serverSocket.accept();
-                        new ClientHandler(clientSocket, cipherPassword).start();
+                        System.out.println("Novo cliente conectado.");
+                        new ClientHandler(clientSocket).start();
                     } catch (IOException e) {
                         System.err.println("Erro ao aceitar conexao: " + e.getMessage());
                     }
@@ -95,31 +109,9 @@ public class SpertaServer {
         }
     }
 
-    private static long getExpectedClientSize() {
-        File f = new File("ficheiros/atestacao.txt");
-        if (!f.exists()) {
-            try {
-                f.getParentFile().mkdirs();
-                try (PrintWriter pw = new PrintWriter(f)) {
-                    pw.println("SpertaClient:2734");
-                }
-            } catch (Exception e) {
-            }
-            return 2734L;
-        }
-        try (BufferedReader br = new BufferedReader(new FileReader(f))) {
-            String line = br.readLine();
-            if (line != null && line.contains(":")) {
-                return Long.parseLong(line.split(":")[1].trim());
-            }
-        } catch (Exception e) {
-        }
-        return 2734L;
-    }
-
     // cria casa
     private static void create(User u, String hm, ObjectOutputStream out) throws IOException {
-        if (catalogoCasas.addCasa(hm, u)) {
+        if (catalogoCasas.addCasa(hm, u, cipherPassword)) {
             System.out.println("Utilizador " + u.nome + " registou casa " + hm + " com sucesso\n");
             out.writeObject("OK");
             return;
@@ -128,7 +120,8 @@ public class SpertaServer {
     }
 
     // da permissao s ao username na casa hm
-    private static void add(User u, String username, String hm, String s, ObjectOutputStream out) throws IOException {
+    private static void add(User u, String username, String hm, String s, ObjectOutputStream out, ObjectInputStream in)
+            throws IOException {
         Casa c = catalogoCasas.getWithId(hm);
 
         if (c == null) {
@@ -150,10 +143,28 @@ public class SpertaServer {
 
         try {
             Permissao p = Permissao.valueOf(s);
-            c.givePerms(uToAdd, p);
-            catalogoCasas.saveCasa(c);
-            System.out.println("Utilizador " + u.nome + " deu permissao a " + s + " na casa " + hm + " com sucesso\n");
-            out.writeObject("OK");
+            byte[] ownerWrappedKey = catalogoCasas.getWrappedKey(hm, p, u.nome, cipherPassword);
+            if (ownerWrappedKey == null) {
+                out.writeObject("NOKEY");
+                return;
+            }
+
+            out.writeObject("OK-ADD-HANDSHAKE");
+            out.writeObject(ownerWrappedKey);
+            out.flush();
+
+            Object response = in.readObject();
+            if (response instanceof byte[]) {
+                byte[] newWrappedKey = (byte[]) response;
+
+                catalogoCasas.saveWrappedKey(hm, p, username, newWrappedKey, cipherPassword);
+
+                c.givePerms(uToAdd, p);
+                catalogoCasas.saveCasa(c, cipherPassword);
+                out.writeObject("OK");
+            } else {
+                out.writeObject("NOK");
+            }
         } catch (IllegalArgumentException e) {
             out.writeObject("NOK");
         }
@@ -175,9 +186,8 @@ public class SpertaServer {
 
         try {
             Permissao p = Permissao.valueOf(s);
-
             c.addAparelho(p);
-            catalogoCasas.saveCasa(c);
+            catalogoCasas.saveCasa(c, cipherPassword);
             System.out.println(
                     "Utilizador " + u.nome + " registou aparelho na seccao " + s + " na casa " + hm + " com sucesso\n");
             out.writeObject("OK");
@@ -187,7 +197,7 @@ public class SpertaServer {
     }
 
     // mete o dispositivo d com estado v na casa hm
-    private static void ec(User u, String hm, String d, int v, ObjectOutputStream out) throws IOException {
+    private static void ec(User u, String hm, String d, ObjectOutputStream out, ObjectInputStream in) throws IOException {
         Casa c = catalogoCasas.getWithId(hm);
 
         if (c == null) {
@@ -208,15 +218,31 @@ public class SpertaServer {
                 return;
             }
 
-            if (!c.changeEstado(d, v)) {
-                out.writeObject("NOK");
+            byte[] wrappedKey = catalogoCasas.getWrappedKey(hm, p, u.nome, cipherPassword);
+            if (wrappedKey == null) { 
+                out.writeObject("NOKEY"); 
                 return;
             }
 
-            catalogoCasas.saveCasa(c);
-            System.out.println(
-                    "Utilizador " + u.nome + " mudou o estado do dispositivo " + d + " para " + v + " com sucesso\n");
-            out.writeObject("OK");
+            out.writeObject("OK-KEY");
+            out.writeObject(wrappedKey);
+            out.flush();
+
+            Object response = in.readObject();
+            if (response instanceof String) {
+                String estadoCifrado = (String) response;
+                
+                if (c.changeEstadoCifrado(d, estadoCifrado)) {
+                    catalogoCasas.saveCasa(c, cipherPassword);
+                    System.out.println("Utilizador " + u.nome + " mudou o estado do dispositivo " + d + " para " + v + " com sucesso\n")
+                    out.writeObject("OK");
+                } else {
+                    out.writeObject("NOK");
+                }
+            } else {
+                out.writeObject("NOK");
+            }
+
         } catch (IllegalArgumentException e) {
             out.writeObject("NOK");
         }
@@ -236,24 +262,29 @@ public class SpertaServer {
         }
 
         StringBuilder sb = new StringBuilder();
+        out.writeObject("OK-DATA");
+
         for (Map.Entry<Permissao, Seccao> entry : c.getSeccoes().entrySet()) {
             if (!c.UserTemPermParaSeccao(u, entry.getKey()))
                 continue;
+
             Seccao s = entry.getValue();
+            byte[] wrappedKey = catalogoCasas.getWrappedKey(hm, entry.getKey(), u.nome, cipherPassword);
+
             for (int i = 1; i <= s.getAparelhoCount(); i++) {
                 sb.append(entry.getKey().name()).append(i).append(":").append(s.GetUltimoEstado(i)).append("\n");
             }
+
+            out.writeObject(entry.getKey().name());
+            out.writeObject(wrappedKey);
         }
 
+        out.writeObject("END-KEYS");
         if (sb.length() == 0) {
             out.writeObject("NODATA");
-            return;
+        } else {
+            out.writeObject(sb.toString());
         }
-
-        byte[] data = sb.toString().getBytes();
-        out.writeObject("OK");
-        out.writeLong(data.length);
-        out.writeObject(data);
     }
 
     // da ao cliente o log do dispositivo d da casa hm
@@ -277,26 +308,26 @@ public class SpertaServer {
             return;
         }
 
-        File logFile = new File("ficheiros/casas/" + hm + "/" + d.charAt(0) + "/" + d + ".csv");
+        File logFile = new File("ficheiros/casas/" + hm + "/" + d.charAt(0) + "/" + d + ".csv.enc");
 
         if (!logFile.exists() || logFile.length() == 0) {
             out.writeObject("NODATA");
             return;
         }
 
-        byte[] data = new byte[(int) logFile.length()];
-        try (FileInputStream fis = new FileInputStream(logFile)) {
-            fis.read(data);
-        }
+        byte[] wrappedKey = catalogoCasas.getWrappedKey(hm, p, u.nome, cipherPassword);
+
+        byte[] logData = SafeFileManager.readSecurely(logFile, cipherPassword, catalogoCasas.getServerSalt());
 
         out.writeObject("OK");
-        out.writeLong(data.length);
-        out.writeObject(data);
+        out.writeObject(wrappedKey);
+        out.writeLong(logData.length);
+        out.writeObject(logData);
     }
 
     // processa a string de comando, faz validacoes, e chama um dos metodos acima
     // TODO
-    private static void proccessCommand(String comando, User u, String cipherPassword, ObjectOutputStream out)
+    private static void proccessCommand(String comando, User u, ObjectOutputStream out, ObjectInputStream in)
             throws IOException {
         String[] tokens = comando.trim().split("\\s+");
 
@@ -313,7 +344,7 @@ public class SpertaServer {
                     out.writeObject("NOK");
                     return;
                 }
-                add(u, tokens[1], tokens[2], tokens[3], out);
+                add(u, tokens[1], tokens[2], tokens[3], out, in);
                 break;
             case "RD":
                 if (tokens.length < 3) {
@@ -323,12 +354,12 @@ public class SpertaServer {
                 rd(u, tokens[1], tokens[2], out);
                 break;
             case "EC":
-                if (tokens.length < 4) {
+                if (tokens.length < 3) {
                     out.writeObject("NOK");
                     return;
                 }
                 try {
-                    ec(u, tokens[1], tokens[2], Integer.parseInt(tokens[3]), out);
+                    ec(u, tokens[1], tokens[2], out, in);
                 } catch (NumberFormatException e) {
                     out.writeObject("NOK");
                 }
@@ -355,16 +386,14 @@ public class SpertaServer {
 
     private static class ClientHandler extends Thread {
         private Socket socket;
-        private String cipherPassword;
         private ObjectOutputStream out;
         private ObjectInputStream in;
         private User loggedUser;
 
         private static final int max_attempts = 3;
 
-        public ClientHandler(Socket socket, String cipherPassword) {
+        public ClientHandler(Socket socket) {
             this.socket = socket;
-            this.cipherPassword = cipherPassword;
         }
 
         // processa a string
@@ -416,16 +445,24 @@ public class SpertaServer {
                 in = new ObjectInputStream(socket.getInputStream());
 
                 // atestacao
-                long clientSize = in.readLong();
-                long expected = getExpectedClientSize();
+                // Fase 2: Atestação Remota (Anti-Replay)
+                long nonce = new SecureRandom().nextLong();
+                out.writeLong(nonce);
+                out.flush();
 
-                if (clientSize == expected) {
-                    out.writeObject("ATTESTATION_OK");
-                } else {
-                    out.writeObject("ATTESTATION_FAILED");
+                byte[] clientHash = (byte[]) in.readObject();
+                File refJar = new File("ficheiros/SpertaClient.jar");
+                MessageDigest md = MessageDigest.getInstance("SHA-256");
+                md.update(ByteBuffer.allocate(8).putLong(nonce).array());
+                md.update(Files.readAllBytes(refJar.toPath()));
+                byte[] serverHash = md.digest();
+
+                if (!MessageDigest.isEqual(clientHash, serverHash)) {
+                    out.writeObject("NOK-ATTEST");
                     socket.close();
                     return;
                 }
+                out.writeObject("OK-ATTEST");
 
                 // auth loop
                 for (int i = 0; i < max_attempts; i++) {
@@ -452,7 +489,7 @@ public class SpertaServer {
                 // command loop
                 String command;
                 while ((command = (String) in.readObject()) != null) {
-                    proccessCommand(command, loggedUser, cipherPassword, out);
+                    proccessCommand(command, loggedUser, out, in);
                     out.flush();
                 }
 
@@ -476,22 +513,49 @@ public class SpertaServer {
         }
     }
 
-    private static void loadServerPrivateKey(String ksPath, String ksPassword) throws Exception {
-        java.security.KeyStore ks = java.security.KeyStore.getInstance("JKS");
-        try (FileInputStream fis = new FileInputStream(ksPath)) {
-            ks.load(fis, ksPassword.toCharArray());
+    private static void initializeSalt() throws IOException {
+        File saltFile = new File("ficheiros/server.salt");
+        if (saltFile.exists()) {
+            serverSalt = Files.readAllBytes(saltFile.toPath());
+        } else {
+            serverSalt = new byte[16];
+            new SecureRandom().nextBytes(serverSalt);
+            saltFile.getParentFile().mkdirs();
+            Files.write(saltFile.toPath(), serverSalt);
         }
-        serverPrivateKey = (java.security.PrivateKey) ks.getKey("sperta", ksPassword.toCharArray());
     }
 
-    private static void loadAttestationInfo() throws IntegrityException {
-        File f = new File("ficheiros/atestacao.txt");
-        try (BufferedReader br = new BufferedReader(new FileReader(f))) {
-            String line = br.readLine();
-            if (line != null && line.contains(":")) {
-                expectedClientHash = line.split(":")[1].trim();
-            }
-        } catch (IOException e) {
+    public static byte[] verifyAndDecrypt(File encryptedFile, String password, byte[] salt) throws Exception {
+
+        byte[] cipherData = Files.readAllBytes(encryptedFile.toPath());
+        File hashFile = new File(encryptedFile.getPath() + ".hash");
+        if (!hashFile.exists())
+            throw new Exception("Hash missing");
+        byte[] expectedHash = Files.readAllBytes(hashFile.toPath());
+
+        byte[] decryptedData = decryptPBE(cipherData, password, salt);
+
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        byte[] actualHash = md.digest(decryptedData);
+
+        if (!MessageDigest.isEqual(actualHash, expectedHash)) {
+            throw new Exception("Integrity failed");
         }
+
+        return decryptedData;
+    }
+
+    private static byte[] decryptPBE(byte[] data, String password, byte[] salt) throws Exception {
+
+        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 65536, 128);
+        SecretKey tmp = factory.generateSecret(spec);
+        SecretKeySpec secret = new SecretKeySpec(tmp.getEncoded(), "AES");
+
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        byte[] iv = Arrays.copyOfRange(data, 0, 16);
+        byte[] encrypted = Arrays.copyOfRange(data, 16, data.length);
+        cipher.init(Cipher.DECRYPT_MODE, secret, new IvParameterSpec(iv));
+        return cipher.doFinal(encrypted);
     }
 }
