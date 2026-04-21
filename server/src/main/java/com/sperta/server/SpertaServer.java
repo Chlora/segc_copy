@@ -4,6 +4,7 @@ import java.io.*;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
+import java.security.AlgorithmParameters;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.security.spec.KeySpec;
@@ -171,7 +172,8 @@ public class SpertaServer {
     }
 
     // regista aparelho na casa hm seccao s
-    private static void rd(User u, String hm, String s, ObjectOutputStream out) throws IOException {
+    private static void rd(User u, String hm, String s, ObjectOutputStream out, ObjectInputStream in)
+            throws IOException {
         Casa c = catalogoCasas.getWithId(hm);
 
         if (c == null) {
@@ -186,18 +188,28 @@ public class SpertaServer {
 
         try {
             Permissao p = Permissao.valueOf(s);
+            boolean isNewSeccao = !c.ExisteSeccao(p);
             c.addAparelho(p);
             catalogoCasas.saveCasa(c, cipherPassword);
-            System.out.println(
-                    "Utilizador " + u.nome + " registou aparelho na seccao " + s + " na casa " + hm + " com sucesso\n");
-            out.writeObject("OK");
+
+            if (isNewSeccao) {
+                out.writeObject("SEND-KEY");
+                out.flush();
+                byte[] newWrappedKey = (byte[]) in.readObject();
+                catalogoCasas.saveWrappedKey(hm, p, u.nome, newWrappedKey, cipherPassword);
+                System.out.println("Utilizador " + u.nome + " registou aparelho na seccao " + s + " na casa " + hm
+                        + " com sucesso\n");
+            } else {
+                out.writeObject("OK");
+            }
         } catch (IllegalArgumentException e) {
             out.writeObject("NOK");
         }
     }
 
     // mete o dispositivo d com estado v na casa hm
-    private static void ec(User u, String hm, String d, ObjectOutputStream out, ObjectInputStream in) throws IOException {
+    private static void ec(User u, String hm, String d, ObjectOutputStream out, ObjectInputStream in)
+            throws IOException {
         Casa c = catalogoCasas.getWithId(hm);
 
         if (c == null) {
@@ -219,8 +231,8 @@ public class SpertaServer {
             }
 
             byte[] wrappedKey = catalogoCasas.getWrappedKey(hm, p, u.nome, cipherPassword);
-            if (wrappedKey == null) { 
-                out.writeObject("NOKEY"); 
+            if (wrappedKey == null) {
+                out.writeObject("NOKEY");
                 return;
             }
 
@@ -231,10 +243,11 @@ public class SpertaServer {
             Object response = in.readObject();
             if (response instanceof String) {
                 String estadoCifrado = (String) response;
-                
+
                 if (c.changeEstadoCifrado(d, estadoCifrado)) {
                     catalogoCasas.saveCasa(c, cipherPassword);
-                    System.out.println("Utilizador " + u.nome + " mudou o estado do dispositivo " + d + " para " + v + " com sucesso\n")
+                    System.out
+                            .println("Utilizador " + u.nome + " mudou o estado do dispositivo " + d + " com sucesso\n");
                     out.writeObject("OK");
                 } else {
                     out.writeObject("NOK");
@@ -317,7 +330,15 @@ public class SpertaServer {
 
         byte[] wrappedKey = catalogoCasas.getWrappedKey(hm, p, u.nome, cipherPassword);
 
-        byte[] logData = SafeFileManager.readSecurely(logFile, cipherPassword, catalogoCasas.getServerSalt());
+        byte[] logData;
+
+        try {
+            logData = verifyAndDecrypt(logFile, cipherPassword, serverSalt);
+        } catch (Exception e) {
+            System.err.println("Erro de integridade ou decifra: " + e.getMessage());
+            out.writeObject("NODATA");
+            return;
+        }
 
         out.writeObject("OK");
         out.writeObject(wrappedKey);
@@ -378,6 +399,19 @@ public class SpertaServer {
                 }
                 rh(u, tokens[1], tokens[2], out);
                 break;
+            case "GETCERT":
+                if (tokens.length < 2) {
+                    out.writeObject("NOK");
+                    return;
+                }
+                File certFile = new File("ficheiros/certs/" + tokens[1] + ".cert");
+                if (certFile.exists()) {
+                    out.writeObject("OK");
+                    out.writeObject(Files.readAllBytes(certFile.toPath()));
+                } else {
+                    out.writeObject("NOCERT");
+                }
+                break;
             default:
                 out.writeObject("NOK");
                 break;
@@ -400,8 +434,9 @@ public class SpertaServer {
         // ve se o utilizador existe. se sim, ve se a pass tem match
         // senao cria novo registo
         // retorna user e escreve no out
-        private static synchronized User authenticate(String composta, ObjectOutputStream out, int attempt)
-                throws IOException {
+        private static synchronized User authenticate(String composta, ObjectOutputStream out, ObjectInputStream in,
+                int attempt)
+                throws Exception {
             String[] tokens = composta.trim().split("\\s+");
 
             if (tokens.length < 2) {
@@ -432,6 +467,14 @@ public class SpertaServer {
             }
 
             catalogoUsers.addUser(tokens[0], tokens[1]);
+            out.writeObject("SEND-CERT");
+            out.flush();
+
+            byte[] certBytes = (byte[]) in.readObject();
+            File certFile = new File("ficheiros/certs/" + tokens[0] + ".cert");
+            certFile.getParentFile().mkdirs();
+            Files.write(certFile.toPath(), certBytes);
+
             out.writeObject("OK-NEW-USER");
             return catalogoUsers.getWithNome(tokens[0]);
         }
@@ -467,7 +510,7 @@ public class SpertaServer {
                 // auth loop
                 for (int i = 0; i < max_attempts; i++) {
                     String auth = (String) in.readObject();
-                    User result = authenticate(auth, out, i);
+                    User result = authenticate(auth, out, in, i);
 
                     if (result != null) {
                         loggedUser = result;
@@ -525,6 +568,34 @@ public class SpertaServer {
         }
     }
 
+    public static void encryptAndSign(File targetFile, byte[] cleanData, String password, byte[] salt)
+            throws Exception {
+
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        byte[] hash = md.digest(cleanData);
+
+        File hashFile = new File(targetFile.getAbsolutePath() + ".hash");
+        hashFile.getParentFile().mkdirs();
+        Files.write(hashFile.toPath(), hash);
+
+        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 65536, 128);
+        SecretKey tmp = factory.generateSecret(spec);
+        SecretKeySpec secret = new SecretKeySpec(tmp.getEncoded(), "AES");
+
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, secret);
+
+        byte[] iv = cipher.getIV();
+        byte[] encryptedData = cipher.doFinal(cleanData);
+
+        ByteBuffer buffer = ByteBuffer.allocate(iv.length + encryptedData.length);
+        buffer.put(iv);
+        buffer.put(encryptedData);
+
+        Files.write(targetFile.toPath(), buffer.array());
+    }
+
     public static byte[] verifyAndDecrypt(File encryptedFile, String password, byte[] salt) throws Exception {
 
         byte[] cipherData = Files.readAllBytes(encryptedFile.toPath());
@@ -555,6 +626,7 @@ public class SpertaServer {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         byte[] iv = Arrays.copyOfRange(data, 0, 16);
         byte[] encrypted = Arrays.copyOfRange(data, 16, data.length);
+
         cipher.init(Cipher.DECRYPT_MODE, secret, new IvParameterSpec(iv));
         return cipher.doFinal(encrypted);
     }
