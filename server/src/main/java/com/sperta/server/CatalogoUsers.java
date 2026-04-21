@@ -3,10 +3,13 @@ package com.sperta.server;
 import com.sperta.server.*;
 
 import java.io.*;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.Collection;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.Base64;
 
 public class CatalogoUsers {
 
@@ -15,7 +18,7 @@ public class CatalogoUsers {
 
     private static final File f = new File("ficheiros/users.txt");
 
-    public CatalogoUsers() {
+    public CatalogoUsers(String cipherPassword, byte[] serverSalt) {
         tabela = new HashMap<>();
         autenticados = new ArrayList<User>();
         loadFromFile();
@@ -33,7 +36,12 @@ public class CatalogoUsers {
         if (tabela.containsKey(nome)) {
             return false;
         }
-        User u = new User(nome, password);
+        byte[] saltBytes = new byte[16];
+        new SecureRandom().nextBytes(saltBytes);
+        String saltStr = Base64.getEncoder().encodeToString(saltBytes);
+        String hashStr = generateHash(password, saltBytes);
+
+        User u = new User(nome, hashStr, saltStr);
         tabela.put(nome, u);
         saveToFile();
         return true;
@@ -45,9 +53,13 @@ public class CatalogoUsers {
 
     public synchronized boolean authenticate(String nome, String password) {
         User u = tabela.get(nome);
-        if (u == null)
+        if (u == null) {
             return false;
-        return u.password.equals(password);
+        }
+
+        byte[] saltBytes = Base64.getDecoder().decode(u.salt);
+        String attemptedHash = generateHash(password, saltBytes);
+        return u.password.equals(attemptedHash);
     }
 
     private synchronized void loadFromFile() {
@@ -58,11 +70,9 @@ public class CatalogoUsers {
         try (BufferedReader br = new BufferedReader(new FileReader(f))) {
             String line;
             while ((line = br.readLine()) != null) {
-                String[] parts = line.split(",");
-                if (parts.length == 2) {
-                    String nome = parts[0].trim();
-                    String password = parts[1].trim();
-                    tabela.put(nome, new User(nome, password));
+                String[] parts = line.split(":");
+                if (parts.length == 3) {
+                    tabela.put(parts[0].trim(), new User(parts[0].trim(), parts[1].trim(), parts[2].trim()));
                 }
             }
         } catch (IOException e) {
@@ -75,7 +85,7 @@ public class CatalogoUsers {
         System.out.println("Saving to: " + f.getAbsolutePath());
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(f))) {
             for (User u : tabela.values()) {
-                bw.write(u.nome + "," + u.password);
+                bw.write(u.nome + ":" + u.password + ":" + u.salt);
                 bw.newLine();
             }
         } catch (IOException e) {
@@ -93,5 +103,16 @@ public class CatalogoUsers {
 
     public synchronized void unregisterAuth(User u) {
         autenticados.remove(u);
+    }
+
+    private String generateHash(String password, byte[] salt) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            md.update(salt);
+            byte[] hash = md.digest(password.getBytes());
+            return Base64.getEncoder().encodeToString(hash);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
