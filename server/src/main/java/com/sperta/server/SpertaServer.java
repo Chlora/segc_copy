@@ -372,7 +372,7 @@ public class SpertaServer {
                     out.writeObject("NOK");
                     return;
                 }
-                rd(u, tokens[1], tokens[2], out);
+                rd(u, tokens[1], tokens[2], out, in);
                 break;
             case "EC":
                 if (tokens.length < 3) {
