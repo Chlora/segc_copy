@@ -630,4 +630,12 @@ public class SpertaServer {
         cipher.init(Cipher.DECRYPT_MODE, secret, new IvParameterSpec(iv));
         return cipher.doFinal(encrypted);
     }
+
+    public static String getCipherPassword() { 
+        return cipherPassword; 
+    }
+
+    public static byte[] getServerSalt() { 
+        return serverSalt;
+    }
 }
