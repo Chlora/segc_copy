@@ -27,15 +27,15 @@ public class Seccao {
         this.aparelhos = ap2;
     }
 
-    public void addAparelho(int estado, File f) {
-        Aparelho ap = new Aparelho(id, "" + id.name() + (1 + this.aparelhos.length), estado, f);
+    public void addAparelho(String estadoCifrado, File f) {
+        Aparelho ap = new Aparelho(id, "" + id.name() + (1 + this.aparelhos.length), estadoCifrado, f);
         insertInArray(ap);
 
         counter++;
     }
 
     public void addAparelho(File f) {
-        Aparelho ap = new Aparelho(id, "" + id.name() + (1 + this.aparelhos.length), 0, f);
+        Aparelho ap = new Aparelho(id, "" + id.name() + (1 + this.aparelhos.length), "0", f);
         insertInArray(ap);
 
         counter++;
@@ -48,9 +48,9 @@ public class Seccao {
     }
     */
 
-    public int getEstado(int id) {
+    public String getEstado(int id) {
         if (id < 1 || id > this.aparelhos.length) {
-            return -1;
+            return "";
         }
         return this.aparelhos[id - 1].getEstado();
     }
@@ -62,7 +62,7 @@ public class Seccao {
         return this.aparelhos[id - 1].GetUltimoEstado();
     }
 
-    public boolean changeEstado(int id, int newEstado, String casaID) {
+    public boolean changeEstado(int id, String newEstado, String casaID) {
         if (id < 1 || id > this.aparelhos.length) {
             return false;
         }

@@ -28,12 +28,12 @@ public class Casa {
         }
 
         EnumSet<Permissao> perms = this.tabelaPermissoes.get(user);
-        
+
         if (p == Permissao.all) {
             perms.clear();
             perms.add(Permissao.all);
         } else {
-            perms.remove(Permissao.all); 
+            perms.remove(Permissao.all);
             perms.add(p);
         }
     }
@@ -46,8 +46,6 @@ public class Casa {
 
         this.tabelaPermissoes.get(user).addAll(p);
     }
-
-    
 
     public synchronized boolean addSeccao(Permissao p) {
         if (tabelaSeccoes.containsKey(p)) {
@@ -72,7 +70,7 @@ public class Casa {
         return true;
     }
 
-    public synchronized boolean addAparelho(Permissao p, int estado) {
+    public synchronized boolean addAparelho(Permissao p, String estado) {
         if (!tabelaSeccoes.containsKey(p)) {
             addSeccao(p);
         }
@@ -84,7 +82,7 @@ public class Casa {
         return true;
     }
 
-    public synchronized boolean addAparelho(Permissao p, int estado, File existingLog) {
+    public synchronized boolean addAparelho(Permissao p, String estado, File existingLog) {
         if (!tabelaSeccoes.containsKey(p)) {
             addSeccao(p);
         }
@@ -92,16 +90,16 @@ public class Casa {
         return true;
     }
 
-    //unused
+    // unused
     /**
-    public synchronized boolean removeAparelho(int id, Permissao p) {
-        if (!tabelaPermissoes.containsKey(p)) {
-            return false;
-        }
-
-        return tabelaSeccoes.get(p).removeAparelho(id);
-    }
-    */
+     * public synchronized boolean removeAparelho(int id, Permissao p) {
+     * if (!tabelaPermissoes.containsKey(p)) {
+     * return false;
+     * }
+     * 
+     * return tabelaSeccoes.get(p).removeAparelho(id);
+     * }
+     */
 
     public String getOwner() {
         for (Map.Entry<User, EnumSet<Permissao>> entry : tabelaPermissoes.entrySet()) {
@@ -113,9 +111,9 @@ public class Casa {
         return "";
     }
 
-    public synchronized int getEstado(String id) {
+    public synchronized String getEstado(String id) {
         if (id.length() < 2) {
-            return -1;
+            return "";
         }
 
         try {
@@ -125,20 +123,20 @@ public class Casa {
                 int resto = Integer.parseInt(id.substring(1));
 
                 if (!tabelaSeccoes.containsKey(p)) {
-                    return -1;
+                    return "";
                 }
 
                 return tabelaSeccoes.get(p).getEstado(resto);
 
             } catch (NumberFormatException e) {
-                return -1;
+                return "";
             }
         } catch (IllegalArgumentException e) {
-            return -1;
+            return "";
         }
     }
 
-    public synchronized boolean changeEstado(String id, int newEstado) {
+    public synchronized boolean changeEstado(String id, String newEstado) {
         if (id.length() < 2) {
             return false;
         }
@@ -146,18 +144,14 @@ public class Casa {
         try {
             Permissao p = Permissao.valueOf(String.valueOf(id.charAt(0)));
 
-            try {
-                int resto = Integer.parseInt(id.substring(1));
+            int resto = Integer.parseInt(id.substring(1));
 
-                if (!tabelaSeccoes.containsKey(p)) {
-                    return false;
-                }
-
-                return tabelaSeccoes.get(p).changeEstado(resto, newEstado, this.id);
-
-            } catch (NumberFormatException e) {
+            if (!tabelaSeccoes.containsKey(p)) {
                 return false;
             }
+
+            return tabelaSeccoes.get(p).changeEstado(resto, newEstado, this.id);
+
         } catch (IllegalArgumentException e) {
             return false;
         }
@@ -169,7 +163,9 @@ public class Casa {
     }
 
     public synchronized boolean UserTemPermParaSeccao(User u, Permissao p) {
-        return tabelaPermissoes.containsKey(u) && (tabelaPermissoes.get(u).contains(p) || tabelaPermissoes.get(u).contains(Permissao.all) || tabelaPermissoes.get(u).contains(Permissao.owner));
+        return tabelaPermissoes.containsKey(u)
+                && (tabelaPermissoes.get(u).contains(p) || tabelaPermissoes.get(u).contains(Permissao.all)
+                        || tabelaPermissoes.get(u).contains(Permissao.owner));
     }
 
     public synchronized Map<Permissao, Seccao> getSeccoes() {

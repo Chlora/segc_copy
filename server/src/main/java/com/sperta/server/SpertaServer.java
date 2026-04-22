@@ -112,7 +112,7 @@ public class SpertaServer {
 
     // cria casa
     private static void create(User u, String hm, ObjectOutputStream out) throws IOException {
-        if (catalogoCasas.addCasa(hm, u, cipherPassword)) {
+        if (catalogoCasas.addCasa(hm, u)) {
             System.out.println("Utilizador " + u.nome + " registou casa " + hm + " com sucesso\n");
             out.writeObject("OK");
             return;
@@ -122,7 +122,7 @@ public class SpertaServer {
 
     // da permissao s ao username na casa hm
     private static void add(User u, String username, String hm, String s, ObjectOutputStream out, ObjectInputStream in)
-            throws IOException {
+            throws Exception {
         Casa c = catalogoCasas.getWithId(hm);
 
         if (c == null) {
@@ -173,7 +173,7 @@ public class SpertaServer {
 
     // regista aparelho na casa hm seccao s
     private static void rd(User u, String hm, String s, ObjectOutputStream out, ObjectInputStream in)
-            throws IOException {
+            throws Exception {
         Casa c = catalogoCasas.getWithId(hm);
 
         if (c == null) {
@@ -209,7 +209,7 @@ public class SpertaServer {
 
     // mete o dispositivo d com estado v na casa hm
     private static void ec(User u, String hm, String d, ObjectOutputStream out, ObjectInputStream in)
-            throws IOException {
+            throws Exception {
         Casa c = catalogoCasas.getWithId(hm);
 
         if (c == null) {
@@ -244,7 +244,7 @@ public class SpertaServer {
             if (response instanceof String) {
                 String estadoCifrado = (String) response;
 
-                if (c.changeEstadoCifrado(d, estadoCifrado)) {
+                if (c.changeEstado(d, estadoCifrado)) {
                     catalogoCasas.saveCasa(c, cipherPassword);
                     System.out
                             .println("Utilizador " + u.nome + " mudou o estado do dispositivo " + d + " com sucesso\n");
@@ -349,7 +349,7 @@ public class SpertaServer {
     // processa a string de comando, faz validacoes, e chama um dos metodos acima
     // TODO
     private static void proccessCommand(String comando, User u, ObjectOutputStream out, ObjectInputStream in)
-            throws IOException {
+            throws Exception {
         String[] tokens = comando.trim().split("\\s+");
 
         switch (tokens[0].toUpperCase()) {

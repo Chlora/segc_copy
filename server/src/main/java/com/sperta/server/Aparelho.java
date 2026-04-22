@@ -11,15 +11,15 @@ public class Aparelho {
     public final Permissao tipo;
     public final String nome;
     private final File logFile;
-    private int estado;
+    private String estadoCifrado;
     private String ultimoEstado = "";
 
     private static final DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    public Aparelho(Permissao tipo, String nome, int estado, File f) {
+    public Aparelho(Permissao tipo, String nome, String estadoCifrado, File f) {
         this.tipo = tipo;
         this.nome = nome;
-        this.estado = estado;
+        this.estadoCifrado = estadoCifrado;
         this.logFile = f;
 
         if (f != null && !f.exists()) {
@@ -32,32 +32,42 @@ public class Aparelho {
         }
     }
 
-    public boolean changeEstado(int newEstado, String casaID) {
-        if (newEstado < 0 || newEstado > 600) {
-            return false;
-        }
-
-        log(this.estado, newEstado, casaID);
-        this.estado = newEstado;
-        ultimoEstado = "Estado mudado de " + estado + " para " + newEstado;
-
+    public boolean changeEstado(String newEstado, String casaID) {
+        log(this.estadoCifrado, newEstado, casaID);
+        this.estadoCifrado = newEstado;
+        ultimoEstado = newEstado;
         return true;
     }
 
-    public int getEstado() {
-        return this.estado;
+    public String getEstado() {
+        return this.estadoCifrado;
     }
 
-    private void log(int estado, int newEstado, String casaID) {
-        LogGlobalAparelhos.write(casaID, nome, " : Estado mudado de " + estado + " para " + newEstado);
-        if (logFile == null)
+    private void log(String estado, String newEstado, String casaID) {
+        LogGlobalAparelhos.write(casaID, nome, newEstado);
+        if (logFile == null) {
             return;
-        logFile.getParentFile().mkdirs();
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(logFile, true))) {
-            bw.write(LocalDateTime.now().format(fmt) + " : Estado mudado de " + estado + " para " + newEstado);
-            bw.newLine();
-        } catch (IOException e) {
-            System.err.println("Erro ao escrever log de " + nome + ": " + e.getMessage());
+        }
+
+        String logsAntigos = "";
+        if (logFile.exists()) {
+            try {
+                byte[] dec = SpertaServer.verifyAndDecrypt(logFile, SpertaServer.getCipherPassword(),
+                        SpertaServer.getServerSalt());
+                logsAntigos = new String(dec);
+            } catch (Exception e) {
+                
+            }
+        }
+
+        String novoLog = LocalDateTime.now().format(fmt) + " : " + newEstado + "\n";
+        String logsAtualizados = logsAntigos + novoLog;
+
+        try {
+            SpertaServer.encryptAndSign(logFile, logsAtualizados.getBytes(), SpertaServer.getCipherPassword(),
+                    SpertaServer.getServerSalt());
+        } catch (Exception e) {
+            System.err.println("Erro ao escrever log seguro: " + e.getMessage());
         }
     }
 
