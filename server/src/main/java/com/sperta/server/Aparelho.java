@@ -56,7 +56,8 @@ public class Aparelho {
                         SpertaServer.getServerSalt());
                 logsAntigos = new String(dec);
             } catch (Exception e) {
-                
+                System.out.println("NOK-INTEGRITY");
+                System.exit(1);
             }
         }
 

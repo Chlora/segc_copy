@@ -111,9 +111,16 @@ public class SpertaServer {
     }
 
     // cria casa
-    private static void create(User u, String hm, ObjectOutputStream out) throws IOException {
+    private static void create(User u, String hm, ObjectOutputStream out, ObjectInputStream in) throws Exception {
         if (catalogoCasas.addCasa(hm, u)) {
-            System.out.println("Utilizador " + u.nome + " registou casa " + hm + " com sucesso\n");
+            out.writeObject("OK-CREATE-HANDSHAKE");
+            out.flush();
+            String[] seccoes = {"E", "G", "L", "M", "P", "S"};
+            for (String s : seccoes) {
+                byte[] wrappedKey = (byte[]) in.readObject();
+                catalogoCasas.saveWrappedKey(hm, Permissao.valueOf(s), u.nome, wrappedKey, cipherPassword);
+            }
+            System.out.println("Utilizador " + u.nome + " registou casa " + hm + " e enviou as chaves.\n");
             out.writeObject("OK");
             return;
         }
@@ -172,36 +179,17 @@ public class SpertaServer {
     }
 
     // regista aparelho na casa hm seccao s
-    private static void rd(User u, String hm, String s, ObjectOutputStream out, ObjectInputStream in)
-            throws Exception {
+    private static void rd(User u, String hm, String s, ObjectOutputStream out) throws Exception {
         Casa c = catalogoCasas.getWithId(hm);
-
-        if (c == null) {
-            out.writeObject("NOHM");
-            return;
-        }
-
-        if (!c.getOwner().equals(u.nome)) {
-            out.writeObject("NOPERM");
-            return;
-        }
-
+        if (c == null) { out.writeObject("NOHM"); return; }
+        if (!c.getOwner().equals(u.nome)) { out.writeObject("NOPERM"); return; }
+        
         try {
             Permissao p = Permissao.valueOf(s);
-            boolean isNewSeccao = !c.ExisteSeccao(p);
             c.addAparelho(p);
             catalogoCasas.saveCasa(c, cipherPassword);
-
-            if (isNewSeccao) {
-                out.writeObject("SEND-KEY");
-                out.flush();
-                byte[] newWrappedKey = (byte[]) in.readObject();
-                catalogoCasas.saveWrappedKey(hm, p, u.nome, newWrappedKey, cipherPassword);
-                System.out.println("Utilizador " + u.nome + " registou aparelho na seccao " + s + " na casa " + hm
-                        + " com sucesso\n");
-            } else {
-                out.writeObject("OK");
-            }
+            System.out.println("Utilizador " + u.nome + " registou aparelho na seccao " + s + " na casa " + hm + " com sucesso\n");
+            out.writeObject("OK");
         } catch (IllegalArgumentException e) {
             out.writeObject("NOK");
         }
@@ -358,7 +346,7 @@ public class SpertaServer {
                     out.writeObject("NOK");
                     return;
                 }
-                create(u, tokens[1], out);
+                create(u, tokens[1], out, in);
                 break;
             case "ADD":
                 if (tokens.length < 4) {
@@ -372,7 +360,7 @@ public class SpertaServer {
                     out.writeObject("NOK");
                     return;
                 }
-                rd(u, tokens[1], tokens[2], out, in);
+                rd(u, tokens[1], tokens[2], out);
                 break;
             case "EC":
                 if (tokens.length < 3) {
@@ -494,7 +482,29 @@ public class SpertaServer {
                 out.flush();
 
                 byte[] clientHash = (byte[]) in.readObject();
-                File refJar = new File("ficheiros/SpertaClient.jar");
+
+                File atestacaoFile = new File("ficheiros/atestacao.enc");
+                String jarPath = "ficheiros/SpertaClient.jar";
+                
+                if (atestacaoFile.exists()) {
+                    try {
+                        byte[] decAtestacao = verifyAndDecrypt(atestacaoFile, cipherPassword, serverSalt);
+                        jarPath = new String(decAtestacao).trim();
+                    } catch (Exception e) {
+                        System.out.println("NOK-INTEGRITY"); 
+                        System.exit(1);
+                    }
+                } else {
+                    encryptAndSign(atestacaoFile, jarPath.getBytes(), cipherPassword, serverSalt);
+                }
+
+                File refJar = new File(jarPath);
+                if (!refJar.exists()) {
+                    out.writeObject("NOK-ATTEST");
+                    socket.close();
+                    return;
+                }
+
                 MessageDigest md = MessageDigest.getInstance("SHA-256");
                 md.update(ByteBuffer.allocate(8).putLong(nonce).array());
                 md.update(Files.readAllBytes(refJar.toPath()));

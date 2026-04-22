@@ -1,5 +1,7 @@
 package com.sperta.server;
 
+import com.sperta.server.*;
+
 import java.io.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -26,7 +28,8 @@ public static synchronized void write(String casaId, String nome, String ultimoC
                     }
                 }
             } catch (Exception e) {
-                System.err.println("Erro ao ler/decifrar log global: " + e.getMessage());
+                System.out.println("NOK-INTEGRITY");
+                System.exit(1);
             }
         }
 

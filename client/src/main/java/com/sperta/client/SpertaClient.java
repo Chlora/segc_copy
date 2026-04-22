@@ -92,7 +92,7 @@ public class SpertaClient {
             socket.startHandshake();
 
             long nonce = in.readLong();
-            File clientJar = new File("SpertaClient.jar"); // Assume que o executavel esta na mesma diretoria
+            File clientJar = new File("SpertaClient.jar");
             if (!clientJar.exists()) {
                 System.err.println("Aviso: SpertaClient.jar nao encontrado localmente. A atestacao ira falhar.");
             } else {
@@ -124,7 +124,7 @@ public class SpertaClient {
                     authenticated = true;
                 
                 }else if (authResponse.equals("SEND-CERT")) {
-                    // Servidor pediu o certificado (Novo utilizador)
+
                     out.writeObject(myCertBytes);
                     out.flush();
                     String newResp = (String) in.readObject();
@@ -161,7 +161,28 @@ public class SpertaClient {
                 String cmdUpper = parts[0].toUpperCase();
 
                 try {
-                    if (cmdUpper.equals("ADD") && parts.length >= 4) {
+                    if (cmdUpper.equals("CREATE") && parts.length >= 2) {
+                        out.writeObject(command);
+                        String createResp = (String) in.readObject();
+                        
+                        if ("OK-CREATE-HANDSHAKE".equals(createResp)) {
+
+                            String[] seccoes = {"E", "G", "L", "M", "P", "S"};
+                            for (String s : seccoes) {
+                                SecretKey newAESKey = generateAESKey();
+                                byte[] wrappedKey = wrapAESKey(newAESKey, myPublicKey);
+                                out.writeObject(wrappedKey);
+                            }
+                            out.flush();
+                            
+                            System.out.println("Resposta: " + in.readObject());
+                        } else {
+                            System.out.println("Resposta: " + createResp);
+                        }
+
+                    }
+
+                    else if (cmdUpper.equals("ADD") && parts.length >= 4) {
 
                         String targetUser = parts[1];
                         
@@ -198,19 +219,8 @@ public class SpertaClient {
                     } else if (cmdUpper.equals("RD") && parts.length >= 3) {
 
                         out.writeObject(command);
-                        String rdResp = (String) in.readObject();
+                        System.out.println("Resposta: " + in.readObject());
                         
-                        if ("SEND-KEY".equals(rdResp)) {
-                        
-                            SecretKey newAESKey = generateAESKey();
-                            byte[] wrappedKey = wrapAESKey(newAESKey, myPublicKey);
-                            out.writeObject(wrappedKey);
-                            out.flush();
-                            System.out.println("Resposta: OK (Nova seccao e chave geradas)");
-
-                        } else {
-                            System.out.println("Resposta: " + rdResp);
-                        }
 
                     } else if (cmdUpper.equals("EC") && parts.length >= 4) {
 
@@ -225,7 +235,6 @@ public class SpertaClient {
                             byte[] wrappedKey = (byte[]) in.readObject();
                             SecretKey sectionAESKey = unwrapAESKey(wrappedKey, myPrivateKey);
                             
-                            // Cifrar o <int> em Base64
                             String estadoCifrado = encryptState(estadoValue, sectionAESKey);
                             out.writeObject(estadoCifrado);
                             out.flush();
@@ -288,10 +297,9 @@ public class SpertaClient {
                             byte[] wrappedKey = (byte[]) in.readObject();
                             SecretKey sectionAESKey = unwrapAESKey(wrappedKey, myPrivateKey);
                             
-                            long fileSize = in.readLong();
+                            in.readLong();
                             byte[] fileData = (byte[]) in.readObject();
                             
-                            // Decifrar o log
                             String logContent = new String(fileData);
                             String[] lines = logContent.split("\n");
                             StringBuilder decryptedLog = new StringBuilder();
@@ -314,7 +322,6 @@ public class SpertaClient {
                         }
 
                     } else {
-
                         out.writeObject(command);
                         System.out.println("Resposta: " + in.readObject());
                     }
