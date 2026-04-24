@@ -13,4 +13,8 @@
 
     <artifactId>sperta-common</artifactId>
 
+    <build>
+        <sourceDirectory>src/main/java</sourceDirectory>
+    </build>
+
 </project>
