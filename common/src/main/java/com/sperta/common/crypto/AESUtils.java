@@ -1,4 +1,4 @@
-package common.src.main.java.com.sperta.common.crypto;
+package com.sperta.common.crypto;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;

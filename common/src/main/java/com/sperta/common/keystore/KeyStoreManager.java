@@ -1,4 +1,4 @@
-package common.src.main.java.com.sperta.common.keystore;
+package com.sperta.common.keystore;
 
 import java.io.FileInputStream;
 import java.security.KeyStore;
@@ -29,7 +29,7 @@ public class KeyStoreManager {
             throw new Exception("Certificate not found for alias: " + alias);
         }
         return cert;
-    }
+    } 
 
 
     public PrivateKey getPrivateKey() throws Exception {

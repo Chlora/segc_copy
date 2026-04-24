@@ -1,4 +1,4 @@
-package common.src.main.java.com.sperta.common.crypto;
+package com.sperta.common.crypto;
 
 import java.io.File;
 import java.io.FileInputStream;
