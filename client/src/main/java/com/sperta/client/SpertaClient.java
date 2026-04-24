@@ -61,6 +61,9 @@ public class SpertaClient {
         System.setProperty("javax.net.ssl.trustStore", truststorePath);
         System.setProperty("javax.net.ssl.trustStorePassword", truststorePwd);
 
+        System.setProperty("javax.net.ssl.keyStrore", keystorePath);
+        System.setProperty("javax.net.ssl.keyStorePassword", keystorePwd);
+
         try {
 
             KeyStore ks = KeyStore.getInstance("JCEKS"); 
