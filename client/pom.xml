@@ -13,6 +13,14 @@
 
     <artifactId>sperta-client</artifactId>
 
+    <dependencies>
+        <dependency>
+            <groupId>com.sperta</groupId>
+            <artifactId>sperta-common</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+    </dependencies>
+
     <build>
         <plugins>
             <plugin>
