@@ -17,6 +17,7 @@ import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
 import com.sperta.common.keystore.KeyStoreManager;
+import com.sperta.common.Enums.Section;
 import com.sperta.common.crypto.*;
 
 public class SpertaClient {
@@ -347,7 +348,7 @@ public class SpertaClient {
                 System.out.println("ATTESTATION OK");
             } else {
                 System.out.println("ATTESTATION FAILED");
-                //System.out.println(attestationResponse);
+                // System.out.println(attestationResponse);
                 return false;
             }
         } catch (IOException e) {
@@ -382,21 +383,32 @@ public class SpertaClient {
 
             System.out.println(authResponse);
 
-            if (authResponse.equals("SEND-CERT")) {
-                sendCertificate();
+            if (authResponse.equals("OK-USER") || authResponse.equals("OK-NEW-USER")) {
                 try {
                     authResponse = (String) in.readObject();
                     System.out.println(authResponse);
-                } catch (ClassNotFoundException e) {
-                    System.out.println("Erro mandar cert class");
-                    e.printStackTrace();
-                } catch (IOException e) {
-                    System.out.println("Erro mandar cert io");
+                } catch (Exception e) {
+                    // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
-            }
 
-            if (authResponse.equals("OK-USER") || authResponse.equals("OK-NEW-USER")) {
+                if (authResponse.equals("SEND-CERT")) {
+                    System.out.println("A enviar certificado...");
+                    sendCertificate();
+                    
+                    try {
+                        authResponse = (String) in.readObject();
+                        System.out.println(authResponse);
+                    } catch (ClassNotFoundException e) {
+                        System.out.println("Erro mandar cert class");
+                        e.printStackTrace();
+                        return false;
+                    } catch (IOException e) {
+                        System.out.println("Erro mandar cert io");
+                        e.printStackTrace();
+                        return false;
+                    }
+                }
                 return true;
             } else if (authResponse.equals("TOO-MANY-ATTEMPTS")) {
                 System.out.println("Demasiadas tentativas falhadas de conexao. A terminar...");
@@ -410,6 +422,20 @@ public class SpertaClient {
             } else {
                 System.out.println("Resposta de autenticacao desconhecida. A terminar...");
                 break;
+            }
+
+            if (authResponse.equals("SEND-CERT")) {
+                sendCertificate();
+                try {
+                    authResponse = (String) in.readObject();
+                    System.out.println(authResponse);
+                } catch (ClassNotFoundException e) {
+                    System.out.println("Erro mandar cert class");
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    System.out.println("Erro mandar cert io");
+                    e.printStackTrace();
+                }
             }
         }
 

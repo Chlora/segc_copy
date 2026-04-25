@@ -6,13 +6,17 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.SocketException;
 import java.security.MessageDigest;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.util.Map;
 
+import javax.crypto.SecretKey;
 import javax.net.ssl.SSLSocket;
 
+import com.sperta.common.Enums.Section;
+import com.sperta.common.crypto.AESUtils;
 import com.sperta.common.crypto.HashUtils;
 
 public class ClientHandler extends Thread {
@@ -98,6 +102,8 @@ public class ClientHandler extends Thread {
         } catch (EOFException e) {
             System.out.println(
                     "Cliente " + (loggedUser != null ? loggedUser.nome : "desconhecido") + " desconectou-se.");
+        } catch (SocketException e) {
+            System.out.println("Cliente " + (loggedUser != null ? loggedUser.nome : "desconhecido") + " desconectou-se.");
         } catch (Exception e) {
             System.err.println("Erro com cliente " + (loggedUser != null ? loggedUser.nome : "desconhecido") + ": "
                     + e.getMessage());
@@ -156,12 +162,21 @@ public class ClientHandler extends Thread {
     private void getCertificate() {
         if (!CertificateHandler.hasCertificate(loggedUser.nome)) {
             try {
-                out.writeObject("SEND_CERT");
+                out.writeObject("SEND-CERT");
                 byte[] certBytes = (byte[]) in.readObject();
                 CertificateHandler.saveCertificate(loggedUser.nome, certBytes);
                 System.out.println("Novo certificado adquirido para o user " + loggedUser.nome);
             } catch (Exception e) {
                 System.out.println("Erro ao receber certificado");
+                e.printStackTrace();
+                return;
+            }
+        } else {
+            try {
+                out.writeObject("OK");
+            } catch (IOException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
             }
         }
 
@@ -169,6 +184,12 @@ public class ClientHandler extends Thread {
             this.publicKey = CertificateHandler.getPublicKey(loggedUser.nome);
         } catch (Exception e) {
             System.out.println("Erro ao aceder a publickey do user " + loggedUser.nome);
+            e.printStackTrace();
+        }
+
+        try {
+            out.writeObject("CERT-GOOD");
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -274,6 +295,21 @@ public class ClientHandler extends Thread {
     // cria casa
     private void create(User u, String hm) throws IOException {
         if (catalogoCasas.addCasa(hm, u)) {
+            out.writeObject("OK");
+
+            //receber section keys
+            for (Section s : Section.values()) {
+                try {
+                    byte[] wrappedKey = (byte[]) in.readObject();
+                    SectionKeyUtils.saveKeyFile(wrappedKey, hm, s, u.nome);
+                } catch (Exception e) {
+                    System.out.println("Erro a receber section keys");
+                    e.printStackTrace();
+                    out.writeObject("NOK");
+                    return;
+                }
+            }
+
             System.out.println("Utilizador " + u.nome + " registou casa " + hm + " com sucesso\n");
             out.writeObject("OK");
             return;
