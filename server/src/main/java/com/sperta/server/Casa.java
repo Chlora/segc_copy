@@ -1,7 +1,5 @@
 package com.sperta.server;
 
-import com.sperta.server.*;
-
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;

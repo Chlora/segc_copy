@@ -1,7 +1,5 @@
 package com.sperta.server;
 
-import com.sperta.server.*;
-
 import java.io.*;
 import java.nio.file.Files;
 import java.util.HashMap;
