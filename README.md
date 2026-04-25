@@ -16,17 +16,19 @@ Se o ficheiro JAR já estiver disponível na pasta `target`, não é necessário
 *(Nota: É necessário utilizar o nome completo da classe, incluindo o package).*
 
 **1. Executar o Servidor:**
-java -jar server/target/sperta-server.jar [port]
+java -jar server/target/sperta-server.jar [port] [password-cifra] [keystore] [password-keystore]
+java -jar server/target/sperta-server.jar 22345 password ./security/server.keystore.jks password
 
 **2. Executar o Cliente:**
-java -jar client/target/sperta-client.jar [IP:port] [username] [password]
+java -jar client/target/sperta-client.jar [IP:port] [truststore] [keystore] [password-keystore] [username] [password]
+java -jar client/target/sperta-client.jar localhost:22345 ./security/client.truststore.jks password ./security/alan.keystore.jks password alan password
 
 
 ## Como compilar
 
 Caso seja necessário gerar os ficheiros JAR novamente, execute na raiz do projeto:
 
-``mvn package``
+``mvn install``
 
 Para limpar os ficheiros, executar na raiz do projeto:
 
