@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.security.MessageDigest;
+import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.util.Map;
 
@@ -14,17 +15,18 @@ import javax.net.ssl.SSLSocket;
 
 import com.sperta.common.crypto.HashUtils;
 
-
 public class ClientHandler extends Thread {
     private SSLSocket socket;
     private ObjectOutputStream out;
     private ObjectInputStream in;
-    private User loggedUser;
     private static CatalogoUsers catalogoUsers;
     private static CatalogoCasas catalogoCasas;
 
     private static String ATTEST_PATH;
     private static String password;
+
+    private User loggedUser;
+    private PublicKey publicKey;
 
     private static final int max_attempts = 3;
 
@@ -36,10 +38,6 @@ public class ClientHandler extends Thread {
     public static void setAttestParams(String path, String pass) {
         ClientHandler.ATTEST_PATH = path;
         ClientHandler.password = pass;
-    }
-
-    public static void setAttestPassword(String pass) {
-
     }
 
     public ClientHandler(SSLSocket socket) {
@@ -79,6 +77,11 @@ public class ClientHandler extends Thread {
             if (loggedUser == null) {
                 System.out.println("Um utilizador tentou autenticar demasiadas vezes. A fechar a ligacao...\n");
                 socket.close();
+                return;
+            }
+
+            getCertificate();
+            if (this.publicKey == null) {
                 return;
             }
 
@@ -128,11 +131,11 @@ public class ClientHandler extends Thread {
             response = (byte[]) in.readObject();
         } catch (IOException | ClassNotFoundException e) {
             System.out.println("Erro ao receber hash nonce");
-            //e.printStackTrace();
+            // e.printStackTrace();
             return false;
         }
 
-        //calcular hash
+        // calcular hash
         String pathToClient = FileUtils.readAttestFile(ATTEST_PATH, password);
 
         byte[] hashed;
@@ -144,10 +147,30 @@ public class ClientHandler extends Thread {
             return false;
         }
 
-        //System.out.println(HexFormat.of().formatHex(response));
-        //System.out.println(HexFormat.of().formatHex(hashed));
+        // System.out.println(HexFormat.of().formatHex(response));
+        // System.out.println(HexFormat.of().formatHex(hashed));
 
         return MessageDigest.isEqual(response, hashed);
+    }
+
+    private void getCertificate() {
+        if (!CertificateHandler.hasCertificate(loggedUser.nome)) {
+            try {
+                out.writeObject("SEND_CERT");
+                byte[] certBytes = (byte[]) in.readObject();
+                CertificateHandler.saveCertificate(loggedUser.nome, certBytes);
+                System.out.println("Novo certificado adquirido para o user " + loggedUser.nome);
+            } catch (Exception e) {
+                System.out.println("Erro ao receber certificado");
+            }
+        }
+
+        try {
+            this.publicKey = CertificateHandler.getPublicKey(loggedUser.nome);
+        } catch (Exception e) {
+            System.out.println("Erro ao aceder a publickey do user " + loggedUser.nome);
+            e.printStackTrace();
+        }
     }
 
     // processa a string
@@ -189,7 +212,6 @@ public class ClientHandler extends Thread {
         out.writeObject("OK-NEW-USER");
         return catalogoUsers.getWithNome(tokens[0]);
     }
-
 
     // processa a string de comando, faz validacoes, e chama um dos metodos acima
     // TODO
@@ -249,7 +271,7 @@ public class ClientHandler extends Thread {
         }
     }
 
-        // cria casa
+    // cria casa
     private void create(User u, String hm) throws IOException {
         if (catalogoCasas.addCasa(hm, u)) {
             System.out.println("Utilizador " + u.nome + " registou casa " + hm + " com sucesso\n");
@@ -310,7 +332,8 @@ public class ClientHandler extends Thread {
 
             c.addAparelho(p);
             catalogoCasas.saveCasa(c);
-            System.out.println("Utilizador " + u.nome + " registou aparelho na seccao " + s + " na casa " + hm + " com sucesso\n");
+            System.out.println(
+                    "Utilizador " + u.nome + " registou aparelho na seccao " + s + " na casa " + hm + " com sucesso\n");
             out.writeObject("OK");
         } catch (IllegalArgumentException e) {
             out.writeObject("NOK");
@@ -325,7 +348,7 @@ public class ClientHandler extends Thread {
             out.writeObject("NOHM");
             return;
         }
-        
+
         try {
             Permissao p = Permissao.valueOf(String.valueOf(d.charAt(0)));
 
@@ -335,9 +358,9 @@ public class ClientHandler extends Thread {
             }
 
             if (!c.ExisteAparelho(d)) {
-            out.writeObject("NOD");
-            return;
-        }
+                out.writeObject("NOD");
+                return;
+            }
 
             if (!c.changeEstado(d, v)) {
                 out.writeObject("NOK");
@@ -345,7 +368,8 @@ public class ClientHandler extends Thread {
             }
 
             catalogoCasas.saveCasa(c);
-            System.out.println("Utilizador " + u.nome + " mudou o estado do dispositivo " + d + " para " + v + " com sucesso\n");
+            System.out.println(
+                    "Utilizador " + u.nome + " mudou o estado do dispositivo " + d + " para " + v + " com sucesso\n");
             out.writeObject("OK");
         } catch (IllegalArgumentException e) {
             out.writeObject("NOK");
@@ -355,34 +379,35 @@ public class ClientHandler extends Thread {
     private void rt(User u, String hm) throws IOException {
         Casa c = catalogoCasas.getWithId(hm);
 
-        if (c == null) { 
+        if (c == null) {
             out.writeObject("NOHM");
-            return; 
+            return;
         }
 
-        if (!c.getPermissoes().containsKey(u)){ 
-            out.writeObject("NOPERM"); 
+        if (!c.getPermissoes().containsKey(u)) {
+            out.writeObject("NOPERM");
             return;
         }
 
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<Permissao, Seccao> entry : c.getSeccoes().entrySet()) {
-            if (!c.UserTemPermParaSeccao(u, entry.getKey())) continue;
+            if (!c.UserTemPermParaSeccao(u, entry.getKey()))
+                continue;
             Seccao s = entry.getValue();
             for (int i = 1; i <= s.getAparelhoCount(); i++) {
                 sb.append(entry.getKey().name()).append(i).append(":").append(s.GetUltimoEstado(i)).append("\n");
             }
         }
 
-        if (sb.length() == 0){ 
-            out.writeObject("NODATA"); 
-            return; 
+        if (sb.length() == 0) {
+            out.writeObject("NODATA");
+            return;
         }
 
         byte[] data = sb.toString().getBytes();
         out.writeObject("OK");
         out.writeLong(data.length);
-        out.writeObject(data); 
+        out.writeObject(data);
     }
 
     // da ao cliente o log do dispositivo d da casa hm
