@@ -18,7 +18,6 @@ import javax.net.ssl.SSLSocketFactory;
 
 import com.sperta.common.keystore.KeyStoreManager;
 import com.sperta.common.crypto.*;
-import com.sperta.client.Section; //nao retirar este import
 
 public class SpertaClient {
 
@@ -348,6 +347,7 @@ public class SpertaClient {
                 System.out.println("ATTESTATION OK");
             } else {
                 System.out.println("ATTESTATION FAILED");
+                //System.out.println(attestationResponse);
                 return false;
             }
         } catch (IOException e) {
