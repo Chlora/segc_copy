@@ -19,6 +19,8 @@ public class SpertaServer {
 
     private static SSLContext sslContext;
 
+    private static final File ROOT_FILES = new File("./ficheiros/");;
+
     private static final String SALT_PATH = "./ficheiros/server.salt";
     private static byte[] salt;
 
@@ -28,6 +30,10 @@ public class SpertaServer {
         if (args.length < 4) {
             System.err.println("Uso: SpertaServer <port> <password-cifra> <keystore> <password-keystore>");
             return;
+        }
+
+        if (!ROOT_FILES.exists()) {
+            ROOT_FILES.mkdirs();
         }
 
         //google disse que 1025 era o minimo para o windows

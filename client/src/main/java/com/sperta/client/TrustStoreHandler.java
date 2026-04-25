@@ -42,7 +42,7 @@ public class TrustStoreHandler {
 
     public boolean hasCertificate(String userId) throws Exception {
         return trustStore.containsAlias(userId);
-    } // TODO Cada vez que um Owner adicionar um utilizador a uma secção (4.4b)
+    }
 
     public void storeCertificate(String userId, Certificate cert) throws Exception {
         trustStore.setCertificateEntry(userId, cert);

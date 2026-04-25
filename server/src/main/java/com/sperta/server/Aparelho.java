@@ -3,21 +3,22 @@ package com.sperta.server;
 import java.io.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HexFormat;
 
 public class Aparelho {
 
     public final Permissao tipo;
     public final String nome;
     private final File logFile;
-    private String estadoCifrado;
+    private byte[] estado;
     private String ultimoEstado = "";
 
     private static final DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    public Aparelho(Permissao tipo, String nome, String estadoCifrado, File f) {
+    public Aparelho(Permissao tipo, String nome, byte[] estado, File f) {
         this.tipo = tipo;
         this.nome = nome;
-        this.estadoCifrado = estadoCifrado;
+        this.estado = estado;
         this.logFile = f;
 
         if (f != null && !f.exists()) {
@@ -30,47 +31,45 @@ public class Aparelho {
         }
     }
 
-    public boolean changeEstado(String newEstado, String casaID) {
-        log(this.estadoCifrado, newEstado, casaID);
-        this.estadoCifrado = newEstado;
-        ultimoEstado = newEstado;
+    public boolean changeEstado(byte[] newEstado, String casaID) {
+        String estadoFormatado = HexFormat.of().formatHex(estado);
+        String newEstadoFormatado = HexFormat.of().formatHex(newEstado);
+
+        log(estadoFormatado, newEstadoFormatado, casaID);
+        this.estado = newEstado;
+        ultimoEstado = "Estado mudado de " + estadoFormatado + " para " + newEstadoFormatado;
+
+        saveEstado();
         return true;
     }
 
-    public String getEstado() {
-        return this.estadoCifrado;
+    public byte[] getEstado() {
+        return this.estado;
     }
 
     private void log(String estado, String newEstado, String casaID) {
-        LogGlobalAparelhos.write(casaID, nome, newEstado);
-        if (logFile == null) {
+        LogGlobalAparelhos.write(casaID, nome, " : Estado mudado de " + estado+ " para " + newEstado);
+        if (logFile == null)
             return;
-        }
-
-        String logsAntigos = "";
-        if (logFile.exists()) {
-            try {
-                byte[] dec = SpertaServer.verifyAndDecrypt(logFile, SpertaServer.getCipherPassword(),
-                        SpertaServer.getServerSalt());
-                logsAntigos = new String(dec);
-            } catch (Exception e) {
-                System.out.println("NOK-INTEGRITY");
-                System.exit(1);
-            }
-        }
-
-        String novoLog = LocalDateTime.now().format(fmt) + " : " + newEstado + "\n";
-        String logsAtualizados = logsAntigos + novoLog;
-
-        try {
-            SpertaServer.encryptAndSign(logFile, logsAtualizados.getBytes(), SpertaServer.getCipherPassword(),
-                    SpertaServer.getServerSalt());
-        } catch (Exception e) {
-            System.err.println("Erro ao escrever log seguro: " + e.getMessage());
+        logFile.getParentFile().mkdirs();
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(logFile, true))) {
+            bw.write(LocalDateTime.now().format(fmt) + " : Estado mudado de " + estado + " para " + newEstado);
+            bw.newLine();
+        } catch (IOException e) {
+            System.err.println("Erro ao escrever log de " + nome + ": " + e.getMessage());
         }
     }
 
     public String GetUltimoEstado() {
         return this.ultimoEstado;
     }
+
+    public void saveEstado() {
+    File stateFile = new File(logFile.getParent(), nome + ".bin");
+    try {
+        java.nio.file.Files.write(stateFile.toPath(), this.estado);
+    } catch (IOException e) {
+        System.err.println("Erro ao guardar estado de " + nome + ": " + e.getMessage());
+    }
+}
 }

@@ -10,13 +10,13 @@ import java.net.SocketException;
 import java.security.MessageDigest;
 import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.Map;
 
-import javax.crypto.SecretKey;
 import javax.net.ssl.SSLSocket;
 
 import com.sperta.common.Enums.Section;
-import com.sperta.common.crypto.AESUtils;
 import com.sperta.common.crypto.HashUtils;
 
 public class ClientHandler extends Thread {
@@ -50,8 +50,6 @@ public class ClientHandler extends Thread {
 
     @Override
     public void run() {
-        // TODO
-        System.out.println("Novo clienthandler inicializado");
 
         try {
             this.out = new ObjectOutputStream(socket.getOutputStream());
@@ -84,6 +82,7 @@ public class ClientHandler extends Thread {
                 return;
             }
 
+            // System.out.println("getcert");
             getCertificate();
             if (this.publicKey == null) {
                 return;
@@ -95,6 +94,7 @@ public class ClientHandler extends Thread {
             // command loop
             String command;
             while ((command = (String) in.readObject()) != null) {
+                //System.out.println(command);
                 proccessCommand(command, loggedUser);
                 out.flush();
             }
@@ -103,10 +103,12 @@ public class ClientHandler extends Thread {
             System.out.println(
                     "Cliente " + (loggedUser != null ? loggedUser.nome : "desconhecido") + " desconectou-se.");
         } catch (SocketException e) {
-            System.out.println("Cliente " + (loggedUser != null ? loggedUser.nome : "desconhecido") + " desconectou-se.");
+            System.out
+                    .println("Cliente " + (loggedUser != null ? loggedUser.nome : "desconhecido") + " desconectou-se.");
         } catch (Exception e) {
             System.err.println("Erro com cliente " + (loggedUser != null ? loggedUser.nome : "desconhecido") + ": "
                     + e.getMessage());
+            e.printStackTrace();
         } finally {
             try {
                 socket.close();
@@ -117,6 +119,77 @@ public class ClientHandler extends Thread {
             if (loggedUser != null) {
                 catalogoUsers.unregisterAuth(loggedUser);
             }
+        }
+    }
+
+    private void sendCertToClient(String userId) {
+        //System.out.println("sendcerttoclient");
+        if (!catalogoUsers.exists(userId)) {
+            try {
+                out.writeObject("NO-USER");
+                return;
+            } catch (IOException e) {
+                System.out.println("Erro ao enviar falta de certificado para o cliente");
+                e.printStackTrace();
+                return;
+            }
+        }
+
+        try {
+            byte[] cert = CertificateHandler.getCertificate(userId);
+            out.writeObject(cert);
+        } catch (Exception e) {
+            System.out.println("Utilizador " + loggedUser.nome + " tentou pedir certificado do utilizador " + userId);
+            try {
+                out.writeObject("NO-USER");
+            } catch (IOException e1) {
+                System.out.println("Erro ao enviar falta de certificado para o cliente");
+                e1.printStackTrace();
+            }
+            e.printStackTrace();
+        }
+    }
+
+    private void sendSectionKey(String hm, String s) {
+        Section sec;
+        try {
+            sec = Section.valueOf(s);
+        } catch (Exception e) {
+            try {
+                out.writeObject("NOK");
+                System.out.println("Seccao " + s + " nao suportada");
+            } catch (IOException e1) {
+                System.out.println("Erro de IO");
+                e1.printStackTrace();
+                return;
+            }
+            return;
+        }
+
+        Casa c = catalogoCasas.getWithId(hm);
+
+        try {
+            if (c == null) {
+                out.writeObject("NOHM");
+                return;
+            }
+            if (!c.getOwner().equals(loggedUser.nome)) {
+                out.writeObject("NOPERM");
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("Erro ao responder ao pedido de sectionkey do user " + loggedUser.nome);
+            return;
+        }
+
+
+        try {
+            out.writeObject("OK");
+            byte[] skey = SectionKeyUtils.getKeyFile(hm, sec, loggedUser.nome);
+            out.writeObject(skey);
+            out.flush();
+        } catch (Exception e) {
+            System.out.println("Erro ao obter sectionkey da home " + hm);
         }
     }
 
@@ -163,6 +236,7 @@ public class ClientHandler extends Thread {
         if (!CertificateHandler.hasCertificate(loggedUser.nome)) {
             try {
                 out.writeObject("SEND-CERT");
+                System.out.println("A pedir certificado ao user " + loggedUser.nome);
                 byte[] certBytes = (byte[]) in.readObject();
                 CertificateHandler.saveCertificate(loggedUser.nome, certBytes);
                 System.out.println("Novo certificado adquirido para o user " + loggedUser.nome);
@@ -170,13 +244,6 @@ public class ClientHandler extends Thread {
                 System.out.println("Erro ao receber certificado");
                 e.printStackTrace();
                 return;
-            }
-        } else {
-            try {
-                out.writeObject("OK");
-            } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
             }
         }
 
@@ -241,50 +308,64 @@ public class ClientHandler extends Thread {
 
         switch (tokens[0].toUpperCase()) {
             case "CREATE":
-                if (tokens.length < 2) {
+                if (tokens.length != 2) {
                     out.writeObject("NOK");
                     return;
                 }
                 create(u, tokens[1]);
                 break;
             case "ADD":
-                if (tokens.length < 4) {
+                if (tokens.length != 4) {
                     out.writeObject("NOK");
                     return;
                 }
                 add(u, tokens[1], tokens[2], tokens[3]);
                 break;
             case "RD":
-                if (tokens.length < 3) {
+                if (tokens.length != 3) {
                     out.writeObject("NOK");
                     return;
                 }
                 rd(u, tokens[1], tokens[2]);
                 break;
             case "EC":
-                if (tokens.length < 4) {
+                if (tokens.length != 3) {
                     out.writeObject("NOK");
                     return;
                 }
                 try {
-                    ec(u, tokens[1], tokens[2], Integer.parseInt(tokens[3]));
+                    ec(u, tokens[1], tokens[2]);
                 } catch (NumberFormatException e) {
                     out.writeObject("NOK");
                 }
                 break;
             case "RT":
-                if (tokens.length < 2) {
+                if (tokens.length != 2) {
                     out.writeObject("NOK");
                     return;
                 }
                 rt(u, tokens[1]);
                 break;
             case "RH":
-                if (tokens.length < 3) {
+                if (tokens.length != 3) {
                     out.writeObject("NOK");
                     return;
                 }
                 rh(u, tokens[1], tokens[2]);
+                break;
+            case "GET-CERT":
+                if (tokens.length != 2) {
+                    out.writeObject("NOK");
+                    return;
+                }
+                sendCertToClient(tokens[1]);
+                break;
+            case "GET-SKEY":
+                if (tokens.length != 3) {
+                    out.writeObject("NOK");
+                    return;
+                }
+                sendSectionKey(tokens[1], tokens[2]);
                 break;
             default:
                 out.writeObject("NOK");
@@ -297,7 +378,7 @@ public class ClientHandler extends Thread {
         if (catalogoCasas.addCasa(hm, u)) {
             out.writeObject("OK");
 
-            //receber section keys
+            // receber section keys
             for (Section s : Section.values()) {
                 try {
                     byte[] wrappedKey = (byte[]) in.readObject();
@@ -335,6 +416,19 @@ public class ClientHandler extends Thread {
 
         if (!c.getOwner().equals(u.nome)) {
             out.writeObject("NOPERM");
+            return;
+        }
+
+        try {
+            byte[] rewrapped = (byte[]) in.readObject();
+            if (c.UserTemPermParaSeccao(catalogoUsers.getWithNome(username), Permissao.valueOf(s))) {
+                System.out.println("User " + u.nome + " tentou adicionar " + username + " mas já tinha permissões");
+                out.writeObject("NOK");
+                return;
+            }
+            SectionKeyUtils.saveKeyFile(rewrapped, hm, Section.valueOf(s), username);
+        } catch (Exception e) {
+            System.out.println("Erro ao tentar salvar keyfile a pedido de " + loggedUser.nome);
             return;
         }
 
@@ -377,7 +471,7 @@ public class ClientHandler extends Thread {
     }
 
     // mete o dispositivo d com estado v na casa hm
-    private void ec(User u, String hm, String d, int v) throws IOException {
+    private void ec(User u, String hm, String d) throws IOException {
         Casa c = catalogoCasas.getWithId(hm);
 
         if (c == null) {
@@ -398,14 +492,40 @@ public class ClientHandler extends Thread {
                 return;
             }
 
-            if (!c.changeEstado(d, v)) {
-                out.writeObject("NOK");
+            out.writeObject("OK");
+            out.flush();
+
+
+            /*Se o utilizador tiver permissão na secção <s> da casa <hm> a que o dispositivo <d>
+            pertence, o SpertaServer envia ao SpertaClient a respetiva Chave da Secção cifrada
+            com chave pública do utilizador; */
+            byte[] secKey = SectionKeyUtils.getKeyFile(hm, Section.valueOf(String.valueOf(d.charAt(0))), u.nome);
+            out.writeObject(secKey);
+            out.flush();
+
+
+            /*O SpertaClient decifra a Chave da Secção <s> com a chave privada do utilizador e
+            envia ao SpertaServer uma mensagem com o valor <int> cifrado com a Chave da
+            Secção recebida. */
+            //TODO
+            byte[] cypheredInt;
+            try {
+                cypheredInt = (byte[]) in.readObject();
+                //System.out.println(HexFormat.of().formatHex(cypheredInt));
+            } catch (Exception e) {
+                System.out.println("Erro a receber int cifrado no EC");
+                e.printStackTrace();
                 return;
             }
 
+            if (!c.changeEstado(d, cypheredInt)) {
+                out.writeObject("NOK");
+                return;
+            }            
+
             catalogoCasas.saveCasa(c);
             System.out.println(
-                    "Utilizador " + u.nome + " mudou o estado do dispositivo " + d + " para " + v + " com sucesso\n");
+                    "Utilizador " + u.nome + " mudou o estado do dispositivo " + d + " para " + HexFormat.of().formatHex(cypheredInt) + " com sucesso\n");
             out.writeObject("OK");
         } catch (IllegalArgumentException e) {
             out.writeObject("NOK");
@@ -425,6 +545,9 @@ public class ClientHandler extends Thread {
             return;
         }
 
+
+        //refazer de modo a simplesmente gettar ficheiro cifrado
+        //TODO 4.3 todo
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<Permissao, Seccao> entry : c.getSeccoes().entrySet()) {
             if (!c.UserTemPermParaSeccao(u, entry.getKey()))

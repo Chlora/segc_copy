@@ -2,6 +2,7 @@ package com.sperta.server;
 
 import java.util.Arrays;
 import java.io.*;
+import java.nio.ByteBuffer;
 
 public class Seccao {
 
@@ -25,15 +26,16 @@ public class Seccao {
         this.aparelhos = ap2;
     }
 
-    public void addAparelho(String estadoCifrado, File f) {
-        Aparelho ap = new Aparelho(id, "" + id.name() + (1 + this.aparelhos.length), estadoCifrado, f);
+    public void addAparelho(byte[] estado, File f) {
+        Aparelho ap = new Aparelho(id, "" + id.name() + (1 + this.aparelhos.length), estado, f);
         insertInArray(ap);
 
         counter++;
     }
 
     public void addAparelho(File f) {
-        Aparelho ap = new Aparelho(id, "" + id.name() + (1 + this.aparelhos.length), "0", f);
+        byte[] bytes = ByteBuffer.allocate(4).putInt(0).array();
+        Aparelho ap = new Aparelho(id, "" + id.name() + (1 + this.aparelhos.length), bytes, f);
         insertInArray(ap);
 
         counter++;
@@ -46,9 +48,9 @@ public class Seccao {
     }
     */
 
-    public String getEstado(int id) {
+    public byte[] getEstado(int id) {
         if (id < 1 || id > this.aparelhos.length) {
-            return "";
+            return null;
         }
         return this.aparelhos[id - 1].getEstado();
     }
@@ -60,7 +62,7 @@ public class Seccao {
         return this.aparelhos[id - 1].GetUltimoEstado();
     }
 
-    public boolean changeEstado(int id, String newEstado, String casaID) {
+    public boolean changeEstado(int id, byte[] newEstado, String casaID) {
         if (id < 1 || id > this.aparelhos.length) {
             return false;
         }

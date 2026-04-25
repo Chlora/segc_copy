@@ -1,7 +1,9 @@
 package com.sperta.client;
 
 import java.io.*;
+import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.cert.Certificate;
@@ -238,10 +240,17 @@ public class SpertaClient {
     private static void handleEC(String[] parts) throws Exception {
         String hm = parts[1];
         String d = parts[2];
-        String value = parts[3];
+        int value = Integer.parseInt(parts[3]);
+
+
+        //presumo que este check tenha de ser aqui agora, jaq o server nao e suposto desencriptar o valor (?)
+        if (value < 0 || value > 600) {
+            System.out.println("Estado tem de estar entre 0 e 600");
+            return;
+        }
 
         // step a
-        out.writeObject("EC " + hm + " " + d + " " + value);
+        out.writeObject("EC " + hm + " " + d);
         out.flush();
 
         // step b
@@ -252,10 +261,12 @@ public class SpertaClient {
         }
 
         byte[] wrappedKey = (byte[]) in.readObject();
+        out.flush();
 
         // step c
         SecretKey sectionKey = AESUtils.unwrapKey(wrappedKey, ksm.getPrivateKey());
-        byte[] encryptedValue = AESUtils.encrypt(value.getBytes(), sectionKey);
+        byte[] bytes = ByteBuffer.allocate(4).putInt(value).array();
+        byte[] encryptedValue = AESUtils.encrypt(bytes, sectionKey);
 
         out.writeObject(encryptedValue);
         out.flush();
@@ -268,6 +279,7 @@ public class SpertaClient {
         String hm = parts[2];
         String section = parts[3];
 
+        // obter cert
         if (!tsh.hasCertificate(user)) {
             out.writeObject("GET-CERT " + user);
             out.flush();
@@ -283,23 +295,50 @@ public class SpertaClient {
             tsh.storeCertificate(user, userCert);
         }
 
-        out.writeObject("ADD " + user + " " + hm + " " + section);
-        out.flush();
-
-        String response = (String) in.readObject();
-        if (!"OK".equals(response)) {
-            System.out.println(response);
+        // obter skey
+        byte[] rewrapped = null;
+        try {
+            rewrapped = handleSectionKey(parts[1], parts[2], parts[3]);
+            if (rewrapped == null) {
+                System.out.println("Erro a tratar section key");
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("Erro a tratar section key. Os argumentos estão corretos?");
             return;
         }
 
-        byte[] wrappedForOwner = (byte[]) in.readObject();
-        SecretKey sectionKey = AESUtils.unwrapKey(wrappedForOwner, ksm.getPrivateKey());
-        byte[] wrappedForUser = AESUtils.wrapKey(sectionKey, tsh.getPublicKey(user));
+        out.writeObject("ADD " + user + " " + hm + " " + section);
+        out.flush();
 
-        out.writeObject(wrappedForUser);
+        out.writeObject(rewrapped);
         out.flush();
 
         System.out.println((String) in.readObject());
+        
+    }
+
+    private static byte[] handleSectionKey(String userId, String hm, String seccao) throws Exception {
+        //pedir section key
+        out.writeObject("GET-SKEY " + hm + " " + seccao);
+
+        String response = (String) in.readObject();
+        
+        if (!"OK".equals(response)) {
+            System.out.println(response);
+            return null;
+        }
+
+        byte[] skey = (byte[]) in.readObject();
+
+        //decifrar
+        PrivateKey pkey = ksm.getPrivateKey();
+        SecretKey sectionKey = AESUtils.unwrapKey(skey, pkey);
+
+        //cifrar
+        byte[] rewrapped = AESUtils.wrapKey(sectionKey, tsh.getPublicKey(userId));
+
+        return rewrapped;
     }
 
     private static void handleCreate(String[] parts) throws Exception {
@@ -323,6 +362,9 @@ public class SpertaClient {
             out.writeObject(wrappedKey);
             out.flush();
         }
+
+        response = (String) in.readObject();
+        System.out.println(response);
     }
 
     private static void saveLocalFile(String filename, byte[] data) {
@@ -395,10 +437,11 @@ public class SpertaClient {
                 if (authResponse.equals("SEND-CERT")) {
                     System.out.println("A enviar certificado...");
                     sendCertificate();
-                    
+
                     try {
                         authResponse = (String) in.readObject();
                         System.out.println(authResponse);
+                        
                     } catch (ClassNotFoundException e) {
                         System.out.println("Erro mandar cert class");
                         e.printStackTrace();
@@ -408,6 +451,8 @@ public class SpertaClient {
                         e.printStackTrace();
                         return false;
                     }
+
+                    
                 }
                 return true;
             } else if (authResponse.equals("TOO-MANY-ATTEMPTS")) {

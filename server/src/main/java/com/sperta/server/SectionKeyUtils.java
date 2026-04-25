@@ -14,7 +14,7 @@ public class SectionKeyUtils {
 
     public static void saveKeyFile(byte[] wrappedKey, String casaId, Section section, String userId)
             throws IOException {
-        Path dir = Paths.get(KEYS_PATH);
+        Path dir = Paths.get(KEYS_PATH + "/" + casaId);
         Files.createDirectories(dir);
 
         String filename = "key." + casaId + "." + section.name() + "." + userId;
@@ -25,8 +25,8 @@ public class SectionKeyUtils {
     public static byte[] getKeyFile(String casaId, Section section, String userId)
             throws IOException {
         String filename = "key." + casaId + "." + section.name() + "." + userId;
-        Path keyPath = Paths.get(KEYS_PATH, filename);
-
+        Path keyPath = Paths.get(KEYS_PATH + "/" + casaId + "/" + filename);
+        //System.out.println(keyPath);
         if (!Files.exists(keyPath)) {
             throw new FileNotFoundException("Section key not found: " + filename);
         }

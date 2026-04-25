@@ -22,6 +22,7 @@ java -jar server/target/sperta-server.jar 22345 password ./security/server.keyst
 **2. Executar o Cliente:**
 java -jar client/target/sperta-client.jar [IP:port] [truststore] [keystore] [password-keystore] [username] [password]
 java -jar client/target/sperta-client.jar localhost:22345 ./security/client.truststore.jks password ./security/alan.keystore.jks password alan password
+java -jar client/target/sperta-client.jar localhost:22345 ./security/client.truststore.jks password ./security/nuno.keystore.jks password nuno password
 
 
 ## Como compilar
