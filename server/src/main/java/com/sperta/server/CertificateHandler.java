@@ -17,6 +17,7 @@ public class CertificateHandler {
 
     public static void saveCertificate(String userId, byte[] certBytes) throws Exception {
         File certFile = new File(CERT_DIR + userId + ".cert");
+        certFile.getParentFile().mkdirs();
         try (FileOutputStream fos = new FileOutputStream(certFile)) {
             fos.write(certBytes);
         }
