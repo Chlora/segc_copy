@@ -3,7 +3,9 @@ package com.sperta.common.crypto;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.PublicKey;
 import java.security.PrivateKey;
@@ -51,14 +53,16 @@ public class AESUtils {
         return cipher.doFinal(ciphertext);
     }
 
-    // Wrap (encrypt) section key with a user's public key (ADD command, Section 4.4 step 2)
+    // Wrap (encrypt) section key with a user's public key (ADD command, Section 4.4
+    // step 2)
     public static byte[] wrapKey(SecretKey sectionKey, PublicKey publicKey) throws Exception {
         Cipher cipher = Cipher.getInstance("RSA");
         cipher.init(Cipher.WRAP_MODE, publicKey);
         return cipher.wrap(sectionKey);
     }
 
-    // Unwrap (decrypt) section key with user's own private key (Section 4.4 steps 2a, 3, 4b)
+    // Unwrap (decrypt) section key with user's own private key (Section 4.4 steps
+    // 2a, 3, 4b)
     public static SecretKey unwrapKey(byte[] wrappedKey, PrivateKey privateKey) throws Exception {
         Cipher cipher = Cipher.getInstance("RSA");
         cipher.init(Cipher.UNWRAP_MODE, privateKey);
@@ -68,5 +72,20 @@ public class AESUtils {
     // Reconstruct SecretKey from raw bytes (e.g. after reading from file)
     public static SecretKey keyFromBytes(byte[] keyBytes) {
         return new SecretKeySpec(keyBytes, ALGORITHM);
+    }
+
+    // Derive a 128-bit AES key from a password + salt using PBKDF2
+    public static SecretKey deriveKeyFromPassword(char[] password, byte[] salt) throws Exception {
+        PBEKeySpec spec = new PBEKeySpec(password, salt, 310_000, KEY_SIZE);
+        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        byte[] keyBytes = factory.generateSecret(spec).getEncoded();
+        
+        return new SecretKeySpec(keyBytes, ALGORITHM);
+    }
+
+    public static byte[] generateSalt() {
+        byte[] salt = new byte[16];
+        new SecureRandom().nextBytes(salt);
+        return salt;
     }
 }
