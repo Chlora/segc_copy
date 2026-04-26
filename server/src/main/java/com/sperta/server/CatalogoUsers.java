@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Collection;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.Base64;
 
 public class CatalogoUsers {
 
@@ -45,39 +46,40 @@ public class CatalogoUsers {
         User u = tabela.get(nome);
         if (u == null)
             return false;
-        return u.password.equals(password);
-    }
-
-    private synchronized void loadFromFile() {
-        if (!f.exists()) {
-            return;
-        }
-
-        try (BufferedReader br = new BufferedReader(new FileReader(f))) {
-            String line;
-            while ((line = br.readLine()) != null) {
-                String[] parts = line.split(",");
-                if (parts.length == 2) {
-                    String nome = parts[0].trim();
-                    String password = parts[1].trim();
-                    tabela.put(nome, new User(nome, password));
-                }
-            }
-        } catch (IOException e) {
-            System.err.println("Erro ao dar load aos users: " + e.getMessage());
-        }
+        String candidateHash = User.hashPassword(password, u.salt);
+        return u.password.equals(candidateHash);
     }
 
     private synchronized void saveToFile() {
         f.getParentFile().mkdirs();
-        System.out.println("Saving to: " + f.getAbsolutePath());
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(f))) {
             for (User u : tabela.values()) {
-                bw.write(u.nome + "," + u.password);
+                String saltB64 = Base64.getEncoder().encodeToString(u.salt);
+                bw.write(u.nome + ":" + u.password + ":" + saltB64);
                 bw.newLine();
             }
         } catch (IOException e) {
             System.err.println("Erro a gravar users: " + e.getMessage());
+        }
+    }
+
+    private synchronized void loadFromFile() {
+        if (!f.exists())
+            return;
+
+        try (BufferedReader br = new BufferedReader(new FileReader(f))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] parts = line.split(":", 3);
+                if (parts.length == 3) {
+                    String nome = parts[0].trim();
+                    String hash = parts[1].trim();
+                    byte[] salt = Base64.getDecoder().decode(parts[2].trim());
+                    tabela.put(nome, User.fromStored(nome, hash, salt));
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Erro ao dar load aos users: " + e.getMessage());
         }
     }
 

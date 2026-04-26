@@ -3,6 +3,7 @@ package com.sperta.client;
 //TODO ver a seccao 2 do pdf e ver se estou a dar encrypt com rsa 2048 + 4.2 (le o pdf todo dnv)
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -10,8 +11,11 @@ import java.security.SecureRandom;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.time.format.DateTimeFormatter;
+import java.util.HexFormat;
 import java.util.NoSuchElementException;
 import java.util.Scanner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.time.LocalDateTime;
 
 import javax.crypto.SecretKey;
@@ -179,7 +183,7 @@ public class SpertaClient {
             System.out.println("A terminar...");
         } catch (Exception e) {
             System.err.println("Erro na conexao: " + e.getMessage());
-            //e.printStackTrace();
+            // e.printStackTrace();
         }
     }
 
@@ -191,7 +195,7 @@ public class SpertaClient {
         out.flush();
 
         String response = (String) in.readObject();
-        if (response.equals("NODATA")) {
+        if (!response.equals("OK")) {
             System.out.println(response);
             return;
         }
@@ -201,19 +205,32 @@ public class SpertaClient {
         byte[] data = in.readNBytes(size);
         ObjectInputStream payload = new ObjectInputStream(new ByteArrayInputStream(data));
 
-        ByteArrayOutputStream result = new ByteArrayOutputStream();
+        byte[] wrappedKey = (byte[]) payload.readObject();
+        byte[] fileBytes = (byte[]) payload.readObject();
 
-        //read file
-
-
-        byte[] wrappedKey = (byte[]) in.readObject();
         SecretKey sectionKey = AESUtils.unwrapKey(wrappedKey, ksm.getPrivateKey());
 
-        byte[] encryptedData = (byte[]) in.readObject();
-        byte[] fileData = AESUtils.decrypt(encryptedData, sectionKey);
+        // read file
+        String csv = new String(fileBytes, StandardCharsets.UTF_8);
+        StringBuilder result = new StringBuilder();
+        Pattern pattern = Pattern.compile("[0-9a-f]{64,}");
+
+        for (String line : csv.split("\n")) {
+            Matcher matcher = pattern.matcher(line);
+            StringBuffer sb = new StringBuffer();
+
+            while (matcher.find()) {
+                byte[] encBytes = HexFormat.of().parseHex(matcher.group());
+                byte[] plain = AESUtils.decrypt(encBytes, sectionKey);
+                int stateValue = ByteBuffer.wrap(plain).getInt();
+                matcher.appendReplacement(sb, String.valueOf(stateValue));
+            }
+            matcher.appendTail(sb);
+            result.append(sb).append("\n");
+        }
 
         String filename = hm + "_" + d.toUpperCase() + "_" + LocalDateTime.now().format(fmt) + ".csv";
-        saveLocalFile(filename, fileData);
+        saveLocalFile(filename, result.toString().getBytes(StandardCharsets.UTF_8));
         System.out.println("OK");
     }
 
@@ -232,7 +249,7 @@ public class SpertaClient {
         int size = (int) in.readLong();
         System.out.println(size);
         byte[] data = in.readNBytes(size);
-        //byte[] data = (byte[]) in.readObject();
+        // byte[] data = (byte[]) in.readObject();
         ObjectInputStream payload = new ObjectInputStream(new ByteArrayInputStream(data));
 
         ByteArrayOutputStream result = new ByteArrayOutputStream();

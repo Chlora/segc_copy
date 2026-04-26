@@ -3,11 +3,11 @@ package com.sperta.server;
 import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.SocketException;
+import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.security.PublicKey;
 import java.security.SecureRandom;
@@ -622,18 +622,16 @@ public class ClientHandler extends Thread {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ObjectOutputStream payload = new ObjectOutputStream(baos);
 
-        
-        byte[] data = new byte[(int) logFile.length()];
-        try (FileInputStream fis = new FileInputStream(logFile)) {
-            fis.read(data);
-        }
-
-        payload.writeObject(data);
-
         byte[] sectionKey = SectionKeyUtils.getKeyFile(hm, Section.valueOf(p.name()), u.nome);
         payload.writeObject(sectionKey);
         payload.flush();
+        
+        byte[] data = new byte[(int) logFile.length()];
+        data = Files.readAllBytes(logFile.toPath());
 
+        payload.writeObject(data);
+        payload.flush();
+        
         out.writeObject("OK");
         byte[] data2 = baos.toByteArray();
         out.writeLong(data2.length);
