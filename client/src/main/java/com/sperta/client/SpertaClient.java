@@ -1,6 +1,5 @@
 package com.sperta.client;
 
-//TODO ver a seccao 2 do pdf e ver se estou a dar encrypt com rsa 2048 + 4.2 (le o pdf todo dnv)
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -188,6 +187,10 @@ public class SpertaClient {
     }
 
     private static void handleRH(String[] parts) throws Exception {
+        if (parts.length != 3) {
+            System.out.println("Argc invalida");
+            return;
+        }
         String hm = parts[1];
         String d = parts[2];
 
@@ -235,6 +238,10 @@ public class SpertaClient {
     }
 
     private static void handleRT(String[] parts) throws Exception {
+        if (parts.length != 2) {
+            System.out.println("Argc invalida");
+            return;
+        }
         String hm = parts[1];
 
         out.writeObject("RT " + hm);
@@ -280,6 +287,10 @@ public class SpertaClient {
     }
 
     private static void handleEC(String[] parts) throws Exception {
+        if (parts.length != 3) {
+            System.out.println("Argc invalida");
+            return;
+        }
         String hm = parts[1];
         String d = parts[2];
         int value = Integer.parseInt(parts[3]);
@@ -317,6 +328,10 @@ public class SpertaClient {
     }
 
     private static void handleAdd(String[] parts) throws Exception {
+        if (parts.length != 4) {
+            System.out.println("Argc invalida");
+            return;
+        }
         String user = parts[1];
         String hm = parts[2];
         String section = parts[3];
@@ -384,6 +399,10 @@ public class SpertaClient {
     }
 
     private static void handleCreate(String[] parts) throws Exception {
+        if (parts.length != 2) {
+            System.out.println("Argc invalida");
+            return;
+        }
         String hm = parts[1];
 
         out.writeObject("CREATE " + hm);
