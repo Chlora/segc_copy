@@ -174,7 +174,7 @@ public class SpertaClient {
                     handleRH(cmdSplit);
                 } else {
                     out.writeObject(command);
-                    System.out.println((String) in.readObject());
+                    System.out.println((String) in.readObject()); //rd funciona por aqui
                 }
             }
 
@@ -187,7 +187,7 @@ public class SpertaClient {
     }
 
     private static void handleRH(String[] parts) throws Exception {
-        if (parts.length != 3) {
+        if (parts.length < 3) {
             System.out.println("Argc invalida");
             return;
         }
@@ -238,7 +238,7 @@ public class SpertaClient {
     }
 
     private static void handleRT(String[] parts) throws Exception {
-        if (parts.length != 2) {
+        if (parts.length < 2) {
             System.out.println("Argc invalida");
             return;
         }
@@ -287,7 +287,7 @@ public class SpertaClient {
     }
 
     private static void handleEC(String[] parts) throws Exception {
-        if (parts.length != 3) {
+        if (parts.length < 4) {
             System.out.println("Argc invalida");
             return;
         }
@@ -328,7 +328,7 @@ public class SpertaClient {
     }
 
     private static void handleAdd(String[] parts) throws Exception {
-        if (parts.length != 4) {
+        if (parts.length < 4) {
             System.out.println("Argc invalida");
             return;
         }
@@ -399,7 +399,7 @@ public class SpertaClient {
     }
 
     private static void handleCreate(String[] parts) throws Exception {
-        if (parts.length != 2) {
+        if (parts.length < 2) {
             System.out.println("Argc invalida");
             return;
         }

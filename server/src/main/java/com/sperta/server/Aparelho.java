@@ -67,7 +67,7 @@ public class Aparelho {
     public void saveEstado() {
         File stateFile = new File(logFile.getParent(), nome + ".bin");
         File ultimoFile = new File(logFile.getParent(), nome + ".ultimo");
-        System.out.println(stateFile.getAbsolutePath());
+        //System.out.println(stateFile.getAbsolutePath());
         try {
             java.nio.file.Files.write(stateFile.toPath(), this.estado);
             java.nio.file.Files.writeString(ultimoFile.toPath(), this.ultimoEstado);

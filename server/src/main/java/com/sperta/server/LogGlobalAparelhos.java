@@ -6,24 +6,40 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.sperta.common.crypto.HashUtils;
+
 public class LogGlobalAparelhos {
 
     private static final File f = new File("ficheiros/logs/global.txt");
     private static final DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    private static boolean initialized = false;
+
     private static void init() {
+        if (initialized) return;
+
         f.getParentFile().mkdirs();
         if (!f.exists()) {
             try {
                 f.createNewFile();
-            } catch (IOException e) {
+                HashUtils.saveHash(f);
+            } catch (Exception e) {
                 System.err.println("Erro ao criar log global: " + e.getMessage());
+                System.exit(1);
+            }
+        } else {
+            //System.out.println("abc");
+            try {
+                HashUtils.verifyIntegrityOrExit(f);
+            } catch (Exception e) {
+                System.out.println("NOK-INTEGRITY");
+                System.exit(1);
             }
         }
     }
 
     // 2026-03-19 18:22:47 : Casa1 M1 -> Estado mudado de 0 para 45
-    public static void write(String casaId, String nome, String ultimoComando) {
+    public synchronized static void write(String casaId, String nome, String ultimoComando) {
         init();
         String timestamp = LocalDateTime.now().format(fmt);
         String newLine = timestamp + " : " + casaId + " " + nome + " -> " + ultimoComando;
@@ -58,10 +74,16 @@ public class LogGlobalAparelhos {
         f.delete();
         temp.renameTo(f);
         sort();
+
+        try {
+            HashUtils.saveHash(f);
+        } catch (Exception e) {
+            System.out.println("NOK-INTEGRITY");
+            System.exit(1);
+        }
     }
 
     private static void sort() {
-        init();
         List<String> lines = new ArrayList<>();
 
         try (BufferedReader br = new BufferedReader(new FileReader(f))) {
@@ -106,3 +128,5 @@ public class LogGlobalAparelhos {
         }
     }
 }
+
+//TODO encriptar
