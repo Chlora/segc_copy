@@ -436,7 +436,7 @@ public class SpertaClient {
                 return false;
             }
         } catch (IOException e) {
-            System.out.println("Erro atestacao IO"); // TODO nok?
+            System.out.println("Erro atestacao IO");
             return false;
         } catch (NoSuchAlgorithmException e) {
             System.out.println("Erro atestacao algorithm");
@@ -462,7 +462,7 @@ public class SpertaClient {
             } catch (IOException | ClassNotFoundException e) {
                 System.out.println("Erro autenticacao");
                 e.printStackTrace();
-                break; // TODO talvez n seja break aqui?
+                break;
             }
 
             System.out.println(authResponse);
@@ -472,8 +472,9 @@ public class SpertaClient {
                     authResponse = (String) in.readObject();
                     System.out.println(authResponse);
                 } catch (Exception e) {
-                    // TODO Auto-generated catch block
+                    System.out.println("Erro interno no auth");
                     e.printStackTrace();
+                    return false;
                 }
 
                 if (authResponse.equals("SEND-CERT")) {

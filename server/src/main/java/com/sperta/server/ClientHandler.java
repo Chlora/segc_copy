@@ -304,7 +304,6 @@ public class ClientHandler extends Thread {
     }
 
     // processa a string de comando, faz validacoes, e chama um dos metodos acima
-    // TODO
     private void proccessCommand(String comando, User u) throws IOException {
         String[] tokens = comando.trim().split("\\s+");
 
@@ -410,7 +409,6 @@ public class ClientHandler extends Thread {
         }
 
         User uToAdd = catalogoUsers.getWithNome(username);
-
         if (uToAdd == null) {
             out.writeObject("NOUSER");
             return;
@@ -592,7 +590,6 @@ public class ClientHandler extends Thread {
     }
 
     // da ao cliente o log do dispositivo d da casa hm
-    // TODO
     private void rh(User u, String hm, String d) throws IOException {
         Casa c = catalogoCasas.getWithId(hm);
 

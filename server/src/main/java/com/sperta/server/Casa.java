@@ -26,12 +26,12 @@ public class Casa {
         }
 
         EnumSet<Permissao> perms = this.tabelaPermissoes.get(user);
-        
+
         if (p == Permissao.all) {
             perms.clear();
             perms.add(Permissao.all);
         } else {
-            perms.remove(Permissao.all); 
+            perms.remove(Permissao.all);
             perms.add(p);
         }
     }
@@ -44,8 +44,6 @@ public class Casa {
 
         this.tabelaPermissoes.get(user).addAll(p);
     }
-
-    
 
     public synchronized boolean addSeccao(Permissao p) {
         if (tabelaSeccoes.containsKey(p)) {
@@ -98,16 +96,16 @@ public class Casa {
         return true;
     }
 
-    //unused
+    // unused
     /**
-    public synchronized boolean removeAparelho(int id, Permissao p) {
-        if (!tabelaPermissoes.containsKey(p)) {
-            return false;
-        }
-
-        return tabelaSeccoes.get(p).removeAparelho(id);
-    }
-    */
+     * public synchronized boolean removeAparelho(int id, Permissao p) {
+     * if (!tabelaPermissoes.containsKey(p)) {
+     * return false;
+     * }
+     * 
+     * return tabelaSeccoes.get(p).removeAparelho(id);
+     * }
+     */
 
     public String getOwner() {
         for (Map.Entry<User, EnumSet<Permissao>> entry : tabelaPermissoes.entrySet()) {
@@ -175,7 +173,9 @@ public class Casa {
     }
 
     public synchronized boolean UserTemPermParaSeccao(User u, Permissao p) {
-        return tabelaPermissoes.containsKey(u) && (tabelaPermissoes.get(u).contains(p) || tabelaPermissoes.get(u).contains(Permissao.all) || tabelaPermissoes.get(u).contains(Permissao.owner));
+        return tabelaPermissoes.containsKey(u)
+                && (tabelaPermissoes.get(u).contains(p) || tabelaPermissoes.get(u).contains(Permissao.all)
+                        || tabelaPermissoes.get(u).contains(Permissao.owner));
     }
 
     public synchronized Map<Permissao, Seccao> getSeccoes() {

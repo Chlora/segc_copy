@@ -3,10 +3,12 @@ package com.sperta.server;
 import java.io.*;
 
 import javax.net.ssl.SSLSocket;
+import javax.crypto.SecretKey;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 
+import com.sperta.common.crypto.HashUtils;
 import com.sperta.common.keystore.KeyStoreManager;
 
 public class SpertaServer {
@@ -36,7 +38,7 @@ public class SpertaServer {
             ROOT_FILES.mkdirs();
         }
 
-        //google disse que 1025 era o minimo para o windows
+        // google disse que 1025 era o minimo para o windows
         int port = Integer.parseInt(args[0]);
         if (1025 > port || port > 65535) {
             port = DEFAULT_PORT;
@@ -59,8 +61,17 @@ public class SpertaServer {
 
         FileUtils.setSalt(salt);
 
+        SecretKey k;
+        try {
+            k = HashUtils.derivePBEKey(cypherPassword, salt);
+        } catch (Exception e) {
+            System.out.println("Erro ao derivar password");
+            e.printStackTrace();
+            return;
+        }
+
         catalogoUsers = new CatalogoUsers();
-        catalogoCasas = new CatalogoCasas(catalogoUsers);
+        catalogoCasas = new CatalogoCasas(catalogoUsers, k);
 
         // criar SSLfactory
         try {
@@ -98,6 +109,7 @@ public class SpertaServer {
 
     }
 
+
     private static boolean verifyArgs(String cypherPassword, String keystorePath, String keystorePassword) {
         if (cypherPassword == null) {
             System.out.println("Password de cifra vazia");
@@ -116,5 +128,4 @@ public class SpertaServer {
         return true;
     }
 
-    
 }

@@ -4,6 +4,9 @@ import java.io.*;
 import java.util.HashMap;
 import java.util.Collection;
 import java.util.Map;
+
+import com.sperta.common.crypto.HashUtils;
+
 import java.util.ArrayList;
 import java.util.Base64;
 
@@ -61,11 +64,25 @@ public class CatalogoUsers {
         } catch (IOException e) {
             System.err.println("Erro a gravar users: " + e.getMessage());
         }
+
+        try {
+            HashUtils.saveHash(f);
+        } catch (Exception e) {
+            System.out.println("Erro ao dar hash ao ficheiro de users");
+            e.printStackTrace();
+        }
     }
 
     private synchronized void loadFromFile() {
         if (!f.exists())
             return;
+
+        try {
+            HashUtils.verifyIntegrityOrExit(f);
+        } catch (Exception e) {
+            System.out.println("NOK-INTEGRITY");
+            System.exit(1);
+        }
 
         try (BufferedReader br = new BufferedReader(new FileReader(f))) {
             String line;

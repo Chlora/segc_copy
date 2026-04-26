@@ -2,17 +2,24 @@ package com.sperta.server;
 
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.security.Key;
 import java.util.HashMap;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Map;
 
+import com.sperta.common.crypto.HashUtils;
+
 public class CatalogoCasas {
 
     private Map<String, Casa> tabela;
     private static final File ROOT_DIR = new File("ficheiros/casas");
+    private final Key pbeKey;
 
-    public CatalogoCasas(CatalogoUsers c) {
+    public CatalogoCasas(CatalogoUsers c, Key pbeKey) {
+        this.pbeKey = pbeKey;
         tabela = new HashMap<>();
         loadAll(c);
     }
@@ -58,8 +65,12 @@ public class CatalogoCasas {
 
         Casa casa = null;
 
-        // 1. load info.txt
-        try (BufferedReader br = new BufferedReader(new FileReader(infoFile))) {
+        // 1. load info.txt — decrypt, verify, then parse
+        byte[] infoPlaintext = HashUtils.decryptAndVerify(infoFile, pbeKey);
+
+        try (BufferedReader br = new BufferedReader(
+                new InputStreamReader(new ByteArrayInputStream(infoPlaintext), StandardCharsets.UTF_8))) {
+
             String line;
             while ((line = br.readLine()) != null) {
                 String[] parts = line.split(":");
@@ -116,11 +127,11 @@ public class CatalogoCasas {
                     continue;
 
                 int counter = 0;
-                try (BufferedReader brCounter = new BufferedReader(new FileReader(counterFile))) {
-                    String counterLine = brCounter.readLine();
-                    if (counterLine != null)
-                        counter = Integer.parseInt(counterLine.trim());
-                } catch (IOException | NumberFormatException e) {
+                try {
+                    byte[] counterPlaintext = HashUtils.decryptAndVerify(counterFile, pbeKey);
+                    String counterLine = new String(counterPlaintext, StandardCharsets.UTF_8).trim();
+                    counter = Integer.parseInt(counterLine);
+                } catch (NumberFormatException e) {
                     System.err.println("Erro ao ler counter da seccao: " + e.getMessage());
                     continue;
                 }
@@ -133,8 +144,7 @@ public class CatalogoCasas {
                     byte[] estado;
                     if (stateFile.exists()) {
                         try {
-                            estado = java.nio.file.Files.readAllBytes(stateFile.toPath());
-                           // System.out.println("Read " + estado.length + " bytes from " + stateFile.getAbsolutePath());
+                            estado = Files.readAllBytes(stateFile.toPath());
                         } catch (IOException e) {
                             System.err.println("Erro ao ler estado de " + p.name() + i + ": " + e.getMessage());
                             estado = ByteBuffer.allocate(4).putInt(0).array();
@@ -142,16 +152,16 @@ public class CatalogoCasas {
                     } else {
                         estado = ByteBuffer.allocate(4).putInt(0).array();
                     }
+
                     File ultimoFile = new File(seccaoDir, p.name() + i + ".ultimo");
                     String ultimoEstado = "";
                     if (ultimoFile.exists()) {
                         try {
-                            ultimoEstado = java.nio.file.Files.readString(ultimoFile.toPath()).trim();
+                            ultimoEstado = Files.readString(ultimoFile.toPath()).trim();
                         } catch (IOException e) {
                             System.err.println("Erro ao ler ultimoEstado de " + p.name() + i + ": " + e.getMessage());
                         }
                     }
-
 
                     casa.addAparelho(p, estado, ultimoEstado, deviceFile);
                 }
@@ -172,26 +182,23 @@ public class CatalogoCasas {
 
         // info.txt
         File infoFile = new File(casaDir, "info.txt");
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(infoFile))) {
-            bw.write("owner:" + c.getOwner());
-            bw.newLine();
+        StringBuilder infoContent = new StringBuilder();
+        infoContent.append("owner:").append(c.getOwner()).append(System.lineSeparator());
 
-            for (Map.Entry<User, EnumSet<Permissao>> entry : c.getPermissoes().entrySet()) {
-                if (entry.getValue().contains(Permissao.owner))
-                    continue;
+        for (Map.Entry<User, EnumSet<Permissao>> entry : c.getPermissoes().entrySet()) {
+            if (entry.getValue().contains(Permissao.owner))
+                continue;
 
-                StringBuilder sb = new StringBuilder();
-                sb.append(entry.getKey().nome).append(":");
-                for (Permissao p : entry.getValue()) {
-                    sb.append(p.name()).append(",");
-                }
-                sb.setLength(sb.length() - 1);
-                bw.write(sb.toString());
-                bw.newLine();
+            StringBuilder sb = new StringBuilder();
+            sb.append(entry.getKey().nome).append(":");
+            for (Permissao p : entry.getValue()) {
+                sb.append(p.name()).append(",");
             }
-        } catch (IOException e) {
-            System.err.println("Erro ao gravar info da casa: " + e.getMessage());
+            sb.setLength(sb.length() - 1);
+            infoContent.append(sb).append(System.lineSeparator());
         }
+
+        HashUtils.saveEncryptedWithHash(infoFile, infoContent.toString().getBytes(StandardCharsets.UTF_8), pbeKey);
 
         // section counters
         for (Map.Entry<Permissao, Seccao> entry : c.getSeccoes().entrySet()) {
@@ -200,11 +207,12 @@ public class CatalogoCasas {
                 seccaoDir.mkdirs();
 
             File counterFile = new File(seccaoDir, "counter.txt");
-            try (BufferedWriter bw = new BufferedWriter(new FileWriter(counterFile))) {
-                bw.write(String.valueOf(entry.getValue().getAparelhoCount()));
-            } catch (IOException e) {
-                System.err.println("Erro ao gravar counter da seccao: " + e.getMessage());
-            }
+            byte[] counterContent = String.valueOf(entry.getValue().getAparelhoCount())
+                    .getBytes(StandardCharsets.UTF_8);
+
+            HashUtils.saveEncryptedWithHash(counterFile, counterContent, pbeKey);
         }
     }
+
+    
 }
