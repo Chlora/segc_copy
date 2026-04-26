@@ -1,6 +1,7 @@
 package com.sperta.server;
 
 import java.util.Arrays;
+
 import java.io.*;
 import java.nio.ByteBuffer;
 
@@ -41,6 +42,14 @@ public class Seccao {
         counter++;
     }
 
+    public void addAparelho(byte[] estado, String ultimoEstado, File f) {
+        Aparelho ap = new Aparelho(id, "" + id.name() + (1 + this.aparelhos.length), estado, f);
+        ap.setUltimoEstado(ultimoEstado);
+        insertInArray(ap);
+
+        counter++;
+    }
+
     //unused
     /**
     public boolean removeAparelho(int id) {
@@ -72,5 +81,9 @@ public class Seccao {
 
     public int getAparelhoCount() {
         return this.counter - 1;
+    }
+
+    public Aparelho[] getAparelhos() {
+        return aparelhos;
     }
 }

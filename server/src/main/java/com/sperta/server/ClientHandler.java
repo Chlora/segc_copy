@@ -1,5 +1,6 @@
 package com.sperta.server;
 
+import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
@@ -10,8 +11,10 @@ import java.net.SocketException;
 import java.security.MessageDigest;
 import java.security.PublicKey;
 import java.security.SecureRandom;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.net.ssl.SSLSocket;
@@ -94,7 +97,7 @@ public class ClientHandler extends Thread {
             // command loop
             String command;
             while ((command = (String) in.readObject()) != null) {
-                //System.out.println(command);
+                // System.out.println(command);
                 proccessCommand(command, loggedUser);
                 out.flush();
             }
@@ -123,7 +126,7 @@ public class ClientHandler extends Thread {
     }
 
     private void sendCertToClient(String userId) {
-        //System.out.println("sendcerttoclient");
+        // System.out.println("sendcerttoclient");
         if (!catalogoUsers.exists(userId)) {
             try {
                 out.writeObject("NO-USER");
@@ -181,7 +184,6 @@ public class ClientHandler extends Thread {
             System.out.println("Erro ao responder ao pedido de sectionkey do user " + loggedUser.nome);
             return;
         }
-
 
         try {
             out.writeObject("OK");
@@ -495,23 +497,14 @@ public class ClientHandler extends Thread {
             out.writeObject("OK");
             out.flush();
 
-
-            /*Se o utilizador tiver permissão na secção <s> da casa <hm> a que o dispositivo <d>
-            pertence, o SpertaServer envia ao SpertaClient a respetiva Chave da Secção cifrada
-            com chave pública do utilizador; */
             byte[] secKey = SectionKeyUtils.getKeyFile(hm, Section.valueOf(String.valueOf(d.charAt(0))), u.nome);
             out.writeObject(secKey);
             out.flush();
 
-
-            /*O SpertaClient decifra a Chave da Secção <s> com a chave privada do utilizador e
-            envia ao SpertaServer uma mensagem com o valor <int> cifrado com a Chave da
-            Secção recebida. */
-            //TODO
             byte[] cypheredInt;
             try {
                 cypheredInt = (byte[]) in.readObject();
-                //System.out.println(HexFormat.of().formatHex(cypheredInt));
+                // System.out.println(HexFormat.of().formatHex(cypheredInt));
             } catch (Exception e) {
                 System.out.println("Erro a receber int cifrado no EC");
                 e.printStackTrace();
@@ -521,11 +514,12 @@ public class ClientHandler extends Thread {
             if (!c.changeEstado(d, cypheredInt)) {
                 out.writeObject("NOK");
                 return;
-            }            
+            }
 
             catalogoCasas.saveCasa(c);
             System.out.println(
-                    "Utilizador " + u.nome + " mudou o estado do dispositivo " + d + " para " + HexFormat.of().formatHex(cypheredInt) + " com sucesso\n");
+                    "Utilizador " + u.nome + " mudou o estado do dispositivo " + d + " para "
+                            + HexFormat.of().formatHex(cypheredInt) + " com sucesso\n");
             out.writeObject("OK");
         } catch (IllegalArgumentException e) {
             out.writeObject("NOK");
@@ -545,28 +539,56 @@ public class ClientHandler extends Thread {
             return;
         }
 
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ObjectOutputStream payload = new ObjectOutputStream(baos);
 
-        //refazer de modo a simplesmente gettar ficheiro cifrado
-        //TODO 4.3 todo
-        StringBuilder sb = new StringBuilder();
-        for (Map.Entry<Permissao, Seccao> entry : c.getSeccoes().entrySet()) {
-            if (!c.UserTemPermParaSeccao(u, entry.getKey()))
-                continue;
+        Map<Permissao, Seccao> seccoes = catalogoCasas.getWithId(hm).getSeccoes();
+
+        Map<Permissao, List<Aparelho>> eligibleMap = new LinkedHashMap<>();
+        for (Map.Entry<Permissao, Seccao> entry : seccoes.entrySet()) {
+            Permissao p = entry.getKey();
             Seccao s = entry.getValue();
-            for (int i = 1; i <= s.getAparelhoCount(); i++) {
-                sb.append(entry.getKey().name()).append(i).append(":").append(s.GetUltimoEstado(i)).append("\n");
+
+            if (c.UserTemPermParaSeccao(u, p)) {
+                List<Aparelho> valid = new ArrayList<>();
+                for (Aparelho a : s.getAparelhos()) {
+                    if (a.getEstado() != null && a.getEstado().length > 4)
+                        valid.add(a);
+                }
+                if (!valid.isEmpty())
+                    eligibleMap.put(p, valid);
             }
         }
 
-        if (sb.length() == 0) {
+        if (eligibleMap.isEmpty()) {
             out.writeObject("NODATA");
             return;
         }
 
-        byte[] data = sb.toString().getBytes();
         out.writeObject("OK");
+
+        payload.writeObject(eligibleMap.size());
+
+        for (Map.Entry<Permissao, List<Aparelho>> entry : eligibleMap.entrySet()) {
+            Permissao p = entry.getKey();
+            List<Aparelho> valid = entry.getValue();
+
+            payload.writeObject(valid.size());
+            byte[] sectionKey = SectionKeyUtils.getKeyFile(hm, Section.valueOf(p.name()), u.nome);
+            payload.writeObject(sectionKey);
+            payload.flush();
+
+            for (Aparelho a : valid) {
+                payload.writeObject(a.nome);
+                payload.writeObject(a.getEstado());
+                payload.flush();
+            }
+        }
+
+        byte[] data = baos.toByteArray();
         out.writeLong(data.length);
-        out.writeObject(data);
+        out.write(data);
+        out.flush();
     }
 
     // da ao cliente o log do dispositivo d da casa hm
@@ -597,14 +619,26 @@ public class ClientHandler extends Thread {
             return;
         }
 
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ObjectOutputStream payload = new ObjectOutputStream(baos);
+
+        
         byte[] data = new byte[(int) logFile.length()];
         try (FileInputStream fis = new FileInputStream(logFile)) {
             fis.read(data);
         }
 
+        payload.writeObject(data);
+
+        byte[] sectionKey = SectionKeyUtils.getKeyFile(hm, Section.valueOf(p.name()), u.nome);
+        payload.writeObject(sectionKey);
+        payload.flush();
+
         out.writeObject("OK");
-        out.writeLong(data.length);
-        out.writeObject(data);
+        byte[] data2 = baos.toByteArray();
+        out.writeLong(data2.length);
+        out.write(data2);
+        out.flush();
     }
 
 }

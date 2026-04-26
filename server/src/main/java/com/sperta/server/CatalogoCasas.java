@@ -134,6 +134,7 @@ public class CatalogoCasas {
                     if (stateFile.exists()) {
                         try {
                             estado = java.nio.file.Files.readAllBytes(stateFile.toPath());
+                           // System.out.println("Read " + estado.length + " bytes from " + stateFile.getAbsolutePath());
                         } catch (IOException e) {
                             System.err.println("Erro ao ler estado de " + p.name() + i + ": " + e.getMessage());
                             estado = ByteBuffer.allocate(4).putInt(0).array();
@@ -141,8 +142,18 @@ public class CatalogoCasas {
                     } else {
                         estado = ByteBuffer.allocate(4).putInt(0).array();
                     }
+                    File ultimoFile = new File(seccaoDir, p.name() + i + ".ultimo");
+                    String ultimoEstado = "";
+                    if (ultimoFile.exists()) {
+                        try {
+                            ultimoEstado = java.nio.file.Files.readString(ultimoFile.toPath()).trim();
+                        } catch (IOException e) {
+                            System.err.println("Erro ao ler ultimoEstado de " + p.name() + i + ": " + e.getMessage());
+                        }
+                    }
 
-                    casa.addAparelho(p, estado, deviceFile);
+
+                    casa.addAparelho(p, estado, ultimoEstado, deviceFile);
                 }
 
             } catch (IllegalArgumentException e) {

@@ -1,5 +1,6 @@
 package com.sperta.client;
 
+//TODO ver a seccao 2 do pdf e ver se estou a dar encrypt com rsa 2048 + 4.2 (le o pdf todo dnv)
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
@@ -178,6 +179,7 @@ public class SpertaClient {
             System.out.println("A terminar...");
         } catch (Exception e) {
             System.err.println("Erro na conexao: " + e.getMessage());
+            //e.printStackTrace();
         }
     }
 
@@ -189,12 +191,21 @@ public class SpertaClient {
         out.flush();
 
         String response = (String) in.readObject();
-        if (!"OK".equals(response)) {
+        if (response.equals("NODATA")) {
             System.out.println(response);
             return;
         }
 
-        // one section key for RH (device belongs to exactly one section)
+        int size = (int) in.readLong();
+        System.out.println(size);
+        byte[] data = in.readNBytes(size);
+        ObjectInputStream payload = new ObjectInputStream(new ByteArrayInputStream(data));
+
+        ByteArrayOutputStream result = new ByteArrayOutputStream();
+
+        //read file
+
+
         byte[] wrappedKey = (byte[]) in.readObject();
         SecretKey sectionKey = AESUtils.unwrapKey(wrappedKey, ksm.getPrivateKey());
 
@@ -213,28 +224,42 @@ public class SpertaClient {
         out.flush();
 
         String response = (String) in.readObject();
-        if (!"OK".equals(response)) {
+        if (response.equals("NODATA")) {
             System.out.println(response);
             return;
         }
 
-        // RT may span multiple sections — server sends count, then one (wrappedKey,
-        // encryptedData) per section
-        int sectionCount = (int) in.readObject();
+        int size = (int) in.readLong();
+        System.out.println(size);
+        byte[] data = in.readNBytes(size);
+        //byte[] data = (byte[]) in.readObject();
+        ObjectInputStream payload = new ObjectInputStream(new ByteArrayInputStream(data));
+
         ByteArrayOutputStream result = new ByteArrayOutputStream();
 
-        for (int i = 0; i < sectionCount; i++) {
-            byte[] wrappedKey = (byte[]) in.readObject();
-            SecretKey sectionKey = AESUtils.unwrapKey(wrappedKey, ksm.getPrivateKey());
+        int elegiveis = (int) payload.readObject();
 
-            byte[] encryptedData = (byte[]) in.readObject();
-            byte[] decryptedData = AESUtils.decrypt(encryptedData, sectionKey);
-            result.write(decryptedData);
+        for (int i = 0; i < elegiveis; i++) {
+            int aparelhoCount = (Integer) payload.readObject();
+            byte[] sectionKey = (byte[]) payload.readObject();
+
+            SecretKey secretKey = AESUtils.unwrapKey(sectionKey, ksm.getPrivateKey());
+
+            for (int j = 0; j < aparelhoCount; j++) {
+                String nome = (String) payload.readObject();
+                byte[] cypheredInt = (byte[]) payload.readObject();
+
+                byte[] decryptedData = AESUtils.decrypt(cypheredInt, secretKey);
+                result.write((nome + ": ").getBytes());
+                int value = ByteBuffer.wrap(decryptedData).getInt();
+                result.write(String.valueOf(value).getBytes());
+                result.write(("\n").getBytes());
+            }
         }
 
         String filename = hm + "_estados.txt";
+        System.out.println("OK, " + size + ", seguido de " + data.length + " bytes de dados.");
         saveLocalFile(filename, result.toByteArray());
-        System.out.println("OK");
     }
 
     private static void handleEC(String[] parts) throws Exception {
@@ -242,8 +267,8 @@ public class SpertaClient {
         String d = parts[2];
         int value = Integer.parseInt(parts[3]);
 
-
-        //presumo que este check tenha de ser aqui agora, jaq o server nao e suposto desencriptar o valor (?)
+        // presumo que este check tenha de ser aqui agora, jaq o server nao e suposto
+        // desencriptar o valor (?)
         if (value < 0 || value > 600) {
             System.out.println("Estado tem de estar entre 0 e 600");
             return;
@@ -315,15 +340,15 @@ public class SpertaClient {
         out.flush();
 
         System.out.println((String) in.readObject());
-        
+
     }
 
     private static byte[] handleSectionKey(String userId, String hm, String seccao) throws Exception {
-        //pedir section key
+        // pedir section key
         out.writeObject("GET-SKEY " + hm + " " + seccao);
 
         String response = (String) in.readObject();
-        
+
         if (!"OK".equals(response)) {
             System.out.println(response);
             return null;
@@ -331,11 +356,11 @@ public class SpertaClient {
 
         byte[] skey = (byte[]) in.readObject();
 
-        //decifrar
+        // decifrar
         PrivateKey pkey = ksm.getPrivateKey();
         SecretKey sectionKey = AESUtils.unwrapKey(skey, pkey);
 
-        //cifrar
+        // cifrar
         byte[] rewrapped = AESUtils.wrapKey(sectionKey, tsh.getPublicKey(userId));
 
         return rewrapped;
@@ -441,7 +466,7 @@ public class SpertaClient {
                     try {
                         authResponse = (String) in.readObject();
                         System.out.println(authResponse);
-                        
+
                     } catch (ClassNotFoundException e) {
                         System.out.println("Erro mandar cert class");
                         e.printStackTrace();
@@ -452,7 +477,6 @@ public class SpertaClient {
                         return false;
                     }
 
-                    
                 }
                 return true;
             } else if (authResponse.equals("TOO-MANY-ATTEMPTS")) {

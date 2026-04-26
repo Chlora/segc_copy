@@ -90,6 +90,14 @@ public class Casa {
         return true;
     }
 
+    public synchronized boolean addAparelho(Permissao p, byte[] estado, String ultimoEstado, File existingLog) {
+        if (!tabelaSeccoes.containsKey(p)) {
+            addSeccao(p);
+        }
+        tabelaSeccoes.get(p).addAparelho(estado, ultimoEstado, existingLog);
+        return true;
+    }
+
     //unused
     /**
     public synchronized boolean removeAparelho(int id, Permissao p) {

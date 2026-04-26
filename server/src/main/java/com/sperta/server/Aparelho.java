@@ -48,7 +48,7 @@ public class Aparelho {
     }
 
     private void log(String estado, String newEstado, String casaID) {
-        LogGlobalAparelhos.write(casaID, nome, " : Estado mudado de " + estado+ " para " + newEstado);
+        LogGlobalAparelhos.write(casaID, nome, " : Estado mudado de " + estado + " para " + newEstado);
         if (logFile == null)
             return;
         logFile.getParentFile().mkdirs();
@@ -65,11 +65,24 @@ public class Aparelho {
     }
 
     public void saveEstado() {
-    File stateFile = new File(logFile.getParent(), nome + ".bin");
-    try {
-        java.nio.file.Files.write(stateFile.toPath(), this.estado);
-    } catch (IOException e) {
-        System.err.println("Erro ao guardar estado de " + nome + ": " + e.getMessage());
+        File stateFile = new File(logFile.getParent(), nome + ".bin");
+        File ultimoFile = new File(logFile.getParent(), nome + ".ultimo");
+        System.out.println(stateFile.getAbsolutePath());
+        try {
+            java.nio.file.Files.write(stateFile.toPath(), this.estado);
+            java.nio.file.Files.writeString(ultimoFile.toPath(), this.ultimoEstado);
+            //System.out.println("Wrote " + stateFile.length() + " bytes to " + stateFile.getAbsolutePath());
+        } catch (IOException e) {
+            System.err.println("Erro ao guardar estado de " + nome + ": " + e.getMessage());
+        }
+
     }
-}
+
+    public String getPathToEstadoFile() {
+        return logFile.getParent() + nome + ".bin";
+    }
+
+    public void setUltimoEstado(String u) {
+        this.ultimoEstado = u;
+    }
 }
