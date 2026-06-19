@@ -69,12 +69,18 @@ Ficheiros como trust/key stores, certificados, e ficheiros recebidos devem ser l
 
 ## Funcionalidades
 
-* CREATE <hm> # Criar casa <hm> - utilizador é Owner
-* ADD <user1> <hm> <s> # Adicionar utilizador <user1> à casa <hm>, seção <s>
-* RD <hm> <s> # Registar um Dispositivo na casa <hm>, na seção <s>
-* EC <hm> <d> <int> # Enviar valor <int> de estado/temporização, do dispositivo <d> da casa <hm>, para o servidor
-* RT <hm># Receber a informação sobre o último comando (estados/temporizações) enviado a cada dispositivo da casa <hm>, desde  que o utilizador tenha permissões
-* RH <hm> <d># Receber o Histórico (ficheiro de log .csv) de comandos enviados ao dispositivo <d> da casa <hm>, desde que o utilizador tenha permissões
+* CREATE 'hm' 
+    * Criar casa 'hm' - utilizador é Owner
+* ADD 'user1' 'hm' 's' 
+    * Adicionar utilizador 'user1' à casa 'hm', seção 's'
+* RD 'hm' 's' 
+    * Registar um Dispositivo na casa 'hm', na seção 's'
+* EC 'hm' 'd' 'int' 
+    * Enviar valor 'int' de estado/temporização, do dispositivo 'd' da casa 'hm', para o servidor
+* RT 'hm' 
+    * Receber a informação sobre o último comando (estados/temporizações) enviado a cada dispositivo da casa 'hm', desde  que o utilizador tenha permissões
+* RH 'hm' 'd'
+    * Receber o Histórico (ficheiro de log .csv) de comandos enviados ao dispositivo 'd' da casa 'hm', desde que o utilizador tenha permissões
 
 
 Ficheiros do servidor são guardados na pasta ``/ficheiros/``
